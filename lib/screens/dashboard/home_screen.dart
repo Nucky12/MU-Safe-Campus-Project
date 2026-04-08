@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
 import '../emergency/medical_id_screen.dart';
+import '../map/safety_map_screen.dart';
+import '../emergency/emergency_contact_screen.dart';
+import '../report/report_history_screen.dart';
+import '../education/faq_tips_screen.dart';
+import '../education/quiz_screen.dart';
+
+
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -19,7 +26,6 @@ class HomeScreen extends StatelessWidget {
       ),
       body: Column(
         children: [
-          // รูปภาพ Banner (เอาสีเทาและไอคอนออกแล้ว)
           Container(
             height: 200,
             width: double.infinity,
@@ -32,7 +38,6 @@ class HomeScreen extends StatelessWidget {
           ),
           Container(height: 5, color: const Color(0xFFFFD700)), 
           
-          // เมนู 6 ปุ่ม
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
@@ -45,9 +50,9 @@ class HomeScreen extends StatelessWidget {
                   _buildMenuCard(context, Icons.location_on_outlined, 'Safety Map', Colors.blue),
                   _buildMenuCard(context, Icons.phone_in_talk_outlined, 'External Emergency\nContacts', Colors.red),
                   _buildMenuCard(context, Icons.medical_information_outlined, 'Digital Medical\nCard', Colors.green),
-                  _buildMenuCard(context, Icons.history_outlined, 'My Reporting\nHistory', Colors.blueGrey),
+                  _buildMenuCard(context, Icons.manage_history, 'My Reporting\nHistory', Colors.blueGrey),
                   _buildMenuCard(context, Icons.lightbulb_outline, 'Safety\nFAQ & Tips', Colors.orange),
-                  _buildMenuCard(context, Icons.assignment_outlined, 'Safety Quiz', Colors.purple),
+                  _buildMenuCard(context, Icons.fact_check_outlined, 'Safety Quiz', Colors.purple),
                 ],
               ),
             ),
@@ -60,8 +65,23 @@ class HomeScreen extends StatelessWidget {
   Widget _buildMenuCard(BuildContext context, IconData icon, String title, Color color) {
     return InkWell(
       onTap: () {
-        if (title.contains('Medical')) {
+        if (title.contains('Safety Map')) {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const SafetyMapScreen()));
+        } 
+        else if (title.contains('External Emergency')) {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const EmergencyContactScreen()));
+        }
+        else if (title.contains('Medical')) {
           Navigator.push(context, MaterialPageRoute(builder: (context) => const MedicalIdScreen()));
+        }
+        else if (title.contains('Reporting')) {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const ReportHistoryScreen()));
+        }
+        else if (title.contains('FAQ')) {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const FaqTipsScreen()));
+        }
+        else if (title.contains('Quiz')) {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const QuizScreen()));
         }
       },
       borderRadius: BorderRadius.circular(12),
@@ -71,7 +91,11 @@ class HomeScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.grey.shade300),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5, offset: const Offset(0, 2)),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 5, 
+              offset: const Offset(0, 2)
+            ),
           ],
         ),
         child: Column(

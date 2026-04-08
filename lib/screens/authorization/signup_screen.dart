@@ -8,7 +8,6 @@ class SignUpScreen extends StatefulWidget {
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
-  // Controller สำหรับรับค่าจากช่องกรอกข้อมูลต่างๆ
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
@@ -97,9 +96,40 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 onPressed: () {
-                  // TODO: ตรวจสอบความถูกต้องของข้อมูล (Validation) และบันทึก
+                  // --- ส่วนที่เพิ่มระบบตรวจสอบ ---
                   
-                  // กลับไปหน้า Login
+                  // 1. เช็คว่ากรอกครบทุกช่องหรือไม่
+                  if (_nameController.text.trim().isEmpty || 
+                      _emailController.text.trim().isEmpty || 
+                      _phoneController.text.trim().isEmpty || 
+                      _passwordController.text.trim().isEmpty || 
+                      _confirmPasswordController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('กรุณากรอกข้อมูลให้ครบทุกช่อง'), backgroundColor: Colors.red),
+                    );
+                    return;
+                  }
+
+                  // 2. เช็ครหัสผ่าน 2 ช่องว่าตรงกันหรือไม่
+                  if (_passwordController.text != _confirmPasswordController.text) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('รหัสผ่านไม่ตรงกัน กรุณาตรวจสอบอีกครั้ง'), backgroundColor: Colors.red),
+                    );
+                    return;
+                  }
+
+                  // 3. เช็คว่ากดยอมรับเงื่อนไขหรือยัง
+                  if (!_acceptTerms) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('กรุณากดยอมรับข้อกำหนดและนโยบายความเป็นส่วนตัว'), backgroundColor: Colors.red),
+                    );
+                    return;
+                  }
+
+                  // ถ้าผ่านทุกเงื่อนไข ให้ขึ้นข้อความสีเขียวแล้วกลับไปหน้า Login
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('ลงทะเบียนสำเร็จ!'), backgroundColor: Colors.green),
+                  );
                   Navigator.pop(context);
                 },
                 child: const Text('Sign up', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFFFFD700))),
@@ -134,7 +164,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
-  // เพิ่ม parameter 'controller' ให้ TextField รับค่าได้
   Widget _buildTextField(String hint, {required TextEditingController controller, TextInputType keyboardType = TextInputType.text}) {
     return TextField(
       controller: controller,
@@ -148,7 +177,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
-  // เพิ่ม parameter 'controller' ให้ TextField รับค่าได้
   Widget _buildPasswordField(String hint, TextEditingController controller, bool isObscure, VoidCallback toggleVisibility) {
     return TextField(
       controller: controller,

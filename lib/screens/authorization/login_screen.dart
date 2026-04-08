@@ -9,7 +9,6 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // Controller สำหรับรับค่าจากช่องกรอกข้อความ
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
@@ -19,7 +18,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    // คืนค่าหน่วยความจำเมื่อปิดหน้าจอ
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -33,7 +31,6 @@ class _LoginScreenState extends State<LoginScreen> {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              // ส่วนหัว
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 30),
@@ -49,7 +46,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               
-              // ฟอร์มล็อกอิน
               Padding(
                 padding: const EdgeInsets.all(24.0),
                 child: Column(
@@ -61,7 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 8),
                     TextField(
-                      controller: _usernameController, // รับค่าข้อมูล
+                      controller: _usernameController,
                       keyboardType: _isEmailLogin ? TextInputType.emailAddress : TextInputType.phone,
                       decoration: InputDecoration(
                         hintText: _isEmailLogin ? 'กรอกอีเมล์' : 'กรอกเบอร์โทรศัพท์',
@@ -75,7 +71,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const Text('รหัสผ่าน', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     TextField(
-                      controller: _passwordController, // รับค่าข้อมูลรหัสผ่าน
+                      controller: _passwordController,
                       obscureText: _obscureText,
                       decoration: InputDecoration(
                         hintText: 'กรอกรหัสผ่าน',
@@ -95,7 +91,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: () {
                           setState(() {
                             _isEmailLogin = !_isEmailLogin;
-                            // ล้างข้อมูลในช่องกรอกเมื่อสลับโหมด
                             _usernameController.clear(); 
                           });
                         },
@@ -127,8 +122,18 @@ class _LoginScreenState extends State<LoginScreen> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                         onPressed: () {
-                          // TODO: ใส่ Logic ตรวจสอบอีเมลและรหัสผ่านตรงนี้
-                          // ตอนนี้ให้กดแล้วไปหน้าหลักเลย
+                          // --- ส่วนที่เพิ่มระบบตรวจสอบ ---
+                          if (_usernameController.text.trim().isEmpty || _passwordController.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('กรุณากรอกข้อมูลให้ครบถ้วน'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return; // ถ้าข้อมูลว่าง ให้หยุดการทำงานตรงนี้ ไม่ไปหน้าถัดไป
+                          }
+
+                          // ถ้าผ่านเงื่อนไขด้านบนมาได้ ค่อยพาไปหน้าหลัก
                           Navigator.pushReplacementNamed(context, '/main');
                         },
                         child: const Text('Login', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFFFFD700))),
