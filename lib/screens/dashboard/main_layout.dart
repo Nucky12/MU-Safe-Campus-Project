@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+
+// --- Import หน้าทั้งหมดที่ใช้ในแถบเมนูด้านล่าง ---
 import 'home_screen.dart';
 import '../report/hazard_reporter_screen.dart';
-// import หน้าอื่นๆ เช่น safety_map.dart, profile.dart เข้ามาที่นี่
+import '../emergency/emergency_contact_screen.dart';
+import '../achievement/score_achievement_screen.dart';
+import '../profile/profile_screen.dart';
 
 class MainLayout extends StatefulWidget {
-  const MainLayout({Key? key}) : super(key: key);
+  const MainLayout({super.key});
 
   @override
   State<MainLayout> createState() => _MainLayoutState();
@@ -13,37 +17,34 @@ class MainLayout extends StatefulWidget {
 class _MainLayoutState extends State<MainLayout> {
   int _selectedIndex = 0;
 
+  // นำหน้าที่เราสร้างเสร็จแล้วมาใส่ในลิสต์ให้ตรงกับเมนู
   final List<Widget> _pages = [
     const HomeScreen(),
-    const Center(child: Text('Emergency Page')), // Placeholder
-    const Center(child: Text('Scores Page')), // Placeholder
-    const Center(child: Text('Profile Page')), // Placeholder
+    const EmergencyContactScreen(),   // เมนูที่ 2: เบอร์ฉุกเฉิน
+    const ScoreAchievementScreen(),   // เมนูที่ 3: คะแนน/เหรียญรางวัล
+    const ProfileScreen(),            // เมนูที่ 4: หน้า Profile ของเรา
   ];
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _pages[_selectedIndex],
+      body: _pages[_selectedIndex], 
+      
       // ปุ่มกล้องตรงกลาง (Hazard Reporter)
-     
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.white,
+        shape: const CircleBorder(side: BorderSide(color: Colors.grey, width: 2)),
         onPressed: () {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const HazardReporterScreen()),
           );
         },
-        shape: const CircleBorder(side: BorderSide(color: Colors.grey, width: 2)),
         child: const Icon(Icons.camera_alt_outlined, color: Colors.black, size: 30),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      
+      // แถบเมนูด้านล่าง
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         notchMargin: 8.0,
@@ -51,11 +52,11 @@ class _MainLayoutState extends State<MainLayout> {
           height: 60,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: <Widget>[
+            children: [
               _buildNavItem(Icons.home_outlined, 'หน้าแรก', 0),
               _buildNavItem(Icons.phone_outlined, 'Emergency', 1),
-              const SizedBox(width: 40), // เว้นที่ให้ปุ่มกล้อง
-              _buildNavItem(Icons.star_border, 'คะแนนของคุณ', 2),
+              const SizedBox(width: 40), // เว้นที่ว่างตรงกลางให้ปุ่มกล้อง
+              _buildNavItem(Icons.star_outline, 'คะแนน', 2),
               _buildNavItem(Icons.person_outline, 'โปรไฟล์', 3),
             ],
           ),
@@ -64,22 +65,26 @@ class _MainLayoutState extends State<MainLayout> {
     );
   }
 
+  // ฟังก์ชันช่วยสร้างปุ่มเมนูด้านล่าง
   Widget _buildNavItem(IconData icon, String label, int index) {
-    return InkWell(
-      onTap: () => _onItemTapped(index),
+    bool isSelected = _selectedIndex == index;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedIndex = index;
+        });
+      },
       child: Column(
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            icon,
-            color: _selectedIndex == index ? const Color(0xFF1D0A45) : Colors.black,
-          ),
+          Icon(icon, color: isSelected ? const Color(0xFF1D0A45) : Colors.grey),
           Text(
             label,
             style: TextStyle(
               fontSize: 10,
-              color: _selectedIndex == index ? const Color(0xFF1D0A45) : Colors.black,
+              color: isSelected ? const Color(0xFF1D0A45) : Colors.grey,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             ),
           ),
         ],
