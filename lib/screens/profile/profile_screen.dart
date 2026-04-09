@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // เพิ่มตัวนี้
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -8,32 +9,50 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // ข้อมูลจำลองของผู้ใช้งาน (สามารถนำไปผูกกับ Database ได้ในอนาคต)
+  // ข้อมูลจำลอง
   String _name = 'นายสิรวิชญ์ น้อยเจริญ';
   String _phone = '089-300-8212';
   String _email = 'sirawit.noy@student.mahidol.ac.th';
   String _studentId = '6787082';
   String _faculty = 'ICT';
-  final String _score = '214'; // คะแนน (ดึงมาจากระบบสะสมคะแนน)
+  final String _score = '214'; 
   
-  bool _showEmergencyInfo = true; // สถานะปุ่มเปิด-ปิด ข้อมูลฉุกเฉิน
+  bool _showEmergencyInfo = true;
 
-  // ฟังก์ชันสำหรับไปหน้าแก้ไขข้อมูล
+  @override
+  void initState() {
+    super.initState();
+    _loadEmergencySetting(); // โหลดสถานะสวิตช์ตอนเข้ามาหน้าโปรไฟล์
+  }
+
+  // ฟังก์ชันดึงค่าปัจจุบัน
+  Future<void> _loadEmergencySetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _showEmergencyInfo = prefs.getBool('showEmergencyInfo') ?? true;
+    });
+  }
+
+  // ฟังก์ชันบันทึกค่าลงเครื่อง
+  Future<void> _toggleEmergencyInfo(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('showEmergencyInfo', value); // เซฟค่า
+    setState(() {
+      _showEmergencyInfo = value;
+    });
+  }
+
+  // ฟังก์ชันไปหน้าแก้ไขข้อมูล
   void _navigateToEditProfile() async {
     final updatedData = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => EditProfileScreen(
-          currentName: _name,
-          currentPhone: _phone,
-          currentEmail: _email,
-          currentStudentId: _studentId,
-          currentFaculty: _faculty,
+          currentName: _name, currentPhone: _phone, currentEmail: _email, currentStudentId: _studentId, currentFaculty: _faculty,
         ),
       ),
     );
 
-    // ถ้ารับค่าที่แก้ไขกลับมา ให้ทำการอัปเดตหน้าจอ
     if (updatedData != null && updatedData is Map<String, String>) {
       setState(() {
         _name = updatedData['name'] ?? _name;
@@ -45,7 +64,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // ฟังก์ชัน Logout
   void _logout() {
     showDialog(
       context: context,
@@ -53,14 +71,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: const Text('ยืนยันการออกจากระบบ'),
         content: const Text('คุณต้องการออกจากระบบใช่หรือไม่?'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('ยกเลิก', style: TextStyle(color: Colors.grey)),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก', style: TextStyle(color: Colors.grey))),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () {
-              // ลบประวัติการเปิดหน้าต่างทั้งหมด แล้วเด้งกลับไปหน้า Login ('/login')
               Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
             },
             child: const Text('ออกจากระบบ', style: TextStyle(color: Colors.white)),
@@ -75,8 +89,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1D0A45), // สีม่วงมหิดล
-        automaticallyImplyLeading: false, // ซ่อนปุ่ม Back เพราะอยู่ใน Bottom Nav
+        backgroundColor: const Color(0xFF1D0A45),
+        automaticallyImplyLeading: false,
         title: const Text('Profile', style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
@@ -96,11 +110,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Stack(
                     alignment: Alignment.bottomRight,
                     children: [
-                      const CircleAvatar(
-                        radius: 50,
-                        backgroundColor: Colors.white,
-                        child: Icon(Icons.person, size: 60, color: Colors.grey),
-                      ),
+                      const CircleAvatar(radius: 50, backgroundColor: Colors.white, child: Icon(Icons.person, size: 60, color: Colors.grey)),
                       Container(
                         decoration: const BoxDecoration(color: Color(0xFFFFD700), shape: BoxShape.circle),
                         padding: const EdgeInsets.all(6),
@@ -113,10 +123,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFD700),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
+                    decoration: BoxDecoration(color: const Color(0xFFFFD700), borderRadius: BorderRadius.circular(20)),
                     child: Text('Score: $_score', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
                   ),
                 ],
@@ -127,7 +134,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 children: [
-                  // ส่วนข้อมูลส่วนตัว
                   _buildInfoRow(Icons.phone, 'เบอร์โทรศัพท์', _phone),
                   const Divider(),
                   _buildInfoRow(Icons.email, 'อีเมล์มหาวิทยาลัย', _email),
@@ -138,7 +144,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   
                   const SizedBox(height: 24),
                   
-                  // ส่วนตั้งค่า เปิด-ปิด ข้อมูลฉุกเฉิน
+                  // ส่วนตั้งค่า เปิด-ปิด ข้อมูลฉุกเฉิน (ผูกกับฟังก์ชันเซฟ)
                   Container(
                     decoration: BoxDecoration(
                       color: Colors.grey[100],
@@ -146,21 +152,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       border: Border.all(color: Colors.grey.shade300),
                     ),
                     child: SwitchListTile(
-                      activeColor: const Color(0xFF1D0A45),
+                      activeThumbColor: const Color(0xFF1D0A45),
                       title: const Text('Emergency Info', style: TextStyle(fontWeight: FontWeight.bold)),
                       subtitle: const Text('แสดง Medical ID บนหน้าจอเมื่อเกิดเหตุฉุกเฉิน (ไม่ต้องล็อกอิน)', style: TextStyle(fontSize: 12)),
                       value: _showEmergencyInfo,
-                      onChanged: (bool value) {
-                        setState(() {
-                          _showEmergencyInfo = value;
-                        });
-                      },
+                      onChanged: _toggleEmergencyInfo, // เปลี่ยนไปเรียกฟังก์ชันเซฟที่เราสร้างไว้
                     ),
                   ),
                   
                   const SizedBox(height: 32),
                   
-                  // ปุ่มแก้ไข และ ปุ่มออกจากระบบ
                   SizedBox(
                     width: double.infinity,
                     height: 50,
@@ -198,7 +199,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Widget ช่วยสร้างแถวข้อมูล
   Widget _buildInfoRow(IconData icon, String title, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -221,9 +221,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-// ==========================================
-// หน้าจอสำหรับแก้ไขข้อมูล (Edit Profile)
-// ==========================================
+// ---------------------------------------------------------
+// หน้าจอสำหรับแก้ไขข้อมูล (Edit Profile) - โค้ดเดิม ไม่มีการเปลี่ยนแปลง
+// ---------------------------------------------------------
 class EditProfileScreen extends StatefulWidget {
   final String currentName;
   final String currentPhone;
@@ -254,7 +254,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    // ดึงข้อมูลเดิมมาใส่ในช่องกรอก
     _nameController = TextEditingController(text: widget.currentName);
     _phoneController = TextEditingController(text: widget.currentPhone);
     _emailController = TextEditingController(text: widget.currentEmail);
@@ -304,7 +303,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 onPressed: () {
-                  // ส่งค่าที่แก้ไขกลับไปหน้าหลัก
                   Navigator.pop(context, {
                     'name': _nameController.text,
                     'phone': _phoneController.text,

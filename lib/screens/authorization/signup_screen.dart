@@ -96,7 +96,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 onPressed: () {
-                  // --- ส่วนที่เพิ่มระบบตรวจสอบ ---
                   
                   // 1. เช็คว่ากรอกครบทุกช่องหรือไม่
                   if (_nameController.text.trim().isEmpty || 
@@ -110,7 +109,33 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     return;
                   }
 
-                  // 2. เช็ครหัสผ่าน 2 ช่องว่าตรงกันหรือไม่
+                  // 2. เช็คชื่อ-นามสกุล (ห้ามมีตัวเลข)
+                  if (RegExp(r'[0-9]').hasMatch(_nameController.text.trim())) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('ชื่อ-นามสกุล ต้องไม่มีตัวเลขผสมอยู่'), backgroundColor: Colors.red),
+                    );
+                    return;
+                  }
+
+                  // 3. เช็คอีเมล (ต้องมี @ และรูปแบบถูกต้อง)
+                  final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                  if (!emailRegex.hasMatch(_emailController.text.trim())) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('รูปแบบอีเมลไม่ถูกต้อง (ต้องมี @)'), backgroundColor: Colors.red),
+                    );
+                    return;
+                  }
+
+                  // 4. เช็คเบอร์โทรศัพท์ (เริ่มต้นด้วย 0 และมี 10 หลัก)
+                  String phoneRaw = _phoneController.text.replaceAll(RegExp(r'\D'), ''); // ลบขีด/เว้นวรรคออกก่อนเช็ค
+                  if (!RegExp(r'^0\d{9}$').hasMatch(phoneRaw)) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('เบอร์โทรศัพท์ต้องเริ่มต้นด้วย 0 และมี 10 หลัก'), backgroundColor: Colors.red),
+                    );
+                    return;
+                  }
+
+                  // 5. เช็ครหัสผ่าน 2 ช่องว่าตรงกันหรือไม่
                   if (_passwordController.text != _confirmPasswordController.text) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('รหัสผ่านไม่ตรงกัน กรุณาตรวจสอบอีกครั้ง'), backgroundColor: Colors.red),
@@ -118,7 +143,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     return;
                   }
 
-                  // 3. เช็คว่ากดยอมรับเงื่อนไขหรือยัง
+                  // 6. เช็คว่ากดยอมรับเงื่อนไขหรือยัง
                   if (!_acceptTerms) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('กรุณากดยอมรับข้อกำหนดและนโยบายความเป็นส่วนตัว'), backgroundColor: Colors.red),
@@ -126,7 +151,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     return;
                   }
 
-                  // ถ้าผ่านทุกเงื่อนไข ให้ขึ้นข้อความสีเขียวแล้วกลับไปหน้า Login
+                  // ถ้าผ่านทุกเงื่อนไข
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('ลงทะเบียนสำเร็จ!'), backgroundColor: Colors.green),
                   );

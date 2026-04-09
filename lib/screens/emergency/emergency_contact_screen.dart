@@ -24,39 +24,71 @@ class EmergencyContactScreen extends StatelessWidget {
           mainAxisSpacing: 20,
           childAspectRatio: 1.0,
           children: [
-            _buildContactBox(context, Icons.airport_shuttle, '1669', 'Ambulance'),
-            _buildContactBox(context, Icons.local_police, '191', 'Police'),
-            _buildContactBox(context, Icons.fire_truck, '199', 'Fire Dept.'),
-            _buildContactBox(context, Icons.add_circle, '1554', 'Vajira Foundation'),
+            _buildContactBox(
+              context, 
+              Icons.airport_shuttle, '1669', 'Ambulance',
+              'สายด่วนสถาบันการแพทย์ฉุกเฉินแห่งชาติ (สพฉ.) ให้บริการ "เจ็บป่วยฉุกเฉินวิกฤต" ฟรีตลอด 24 ชั่วโมง ทั่วไทย เมื่อเกิดอุบัติเหตุหรือผู้ป่วยวิกฤต (สีแดง/เหลือง) ให้ตั้งสติ โทร 1669 แจ้งอาการและสถานที่เกิดเหตุให้ชัดเจน',
+              'ใช้เมื่อฉุกเฉินจริง: เจ็บแน่นหน้าอก, หายใจไม่ออก, หมดสติ, เลือดออกมาก, อุบัติเหตุรุนแรง\n\nสิ่งที่ต้องทำ:\n1. ตั้งสติ บอกสถานที่เกิดเหตุ\n2. แจ้งอาการบาดเจ็บ\n3. บอกชื่อและเบอร์โทรที่ติดต่อได้\n4. ทำตามคำแนะนำเจ้าหน้าที่'
+            ),
+            _buildContactBox(
+              context, 
+              Icons.local_police, '191', 'Police',
+              'สายด่วนศูนย์รับแจ้งเหตุตำรวจแห่งชาติ ให้บริการตลอด 24 ชั่วโมง ใช้สำหรับแจ้งเหตุด่วนเหตุร้าย อาชญากรรม ทะเลาะวิวาท หรือพบเห็นเหตุการณ์ที่อาจเป็นอันตรายต่อชีวิตและทรัพย์สิน',
+              'ใช้เมื่อ: เกิดเหตุอาชญากรรม, โจรผู้ร้าย, ทะเลาะวิวาท, หรือเหตุที่ต้องใช้กำลังตำรวจ\n\nสิ่งที่ต้องทำ:\n1. บอกลักษณะเหตุการณ์\n2. สถานที่เกิดเหตุและจุดสังเกต\n3. ลักษณะคนร้าย (รูปพรรณ, ยานพาหนะ)\n4. ระมัดระวังความปลอดภัยของตนเอง'
+            ),
+            _buildContactBox(
+              context, 
+              Icons.fire_truck, '199', 'Fire Dept.',
+              'สายด่วนศูนย์วิทยุพระราม แจ้งเหตุอัคคีภัยและกู้ภัย ให้บริการ 24 ชั่วโมง ใช้สำหรับแจ้งเหตุไฟไหม้ สัตว์มีพิษเข้าบ้าน หรือขอความช่วยเหลือด้านกู้ภัยต่างๆ',
+              'ใช้เมื่อ: เกิดเพลิงไหม้, พบสัตว์มีพิษ (งู, ตัวเงินตัวทอง), หรือภัยพิบัติต่างๆ\n\nสิ่งที่ต้องทำ:\n1. แจ้งประเภทของเหตุ (ไฟไหม้/จับสัตว์)\n2. สถานที่เกิดเหตุอย่างละเอียด\n3. มีผู้ติดอยู่ภายในอาคารหรือไม่\n4. รีบออกจากพื้นที่อันตรายทันที'
+            ),
+            _buildContactBox(
+              context, 
+              Icons.add_circle, '1554', 'Vajira Foundation',
+              'สายด่วนหน่วยกู้ชีพ คณะแพทยศาสตร์วชิรพยาบาล ให้บริการแพทย์ฉุกเฉินและกู้ชีพขั้นสูง พร้อมทีมแพทย์และพยาบาลเฉพาะทาง',
+              'ใช้เมื่อ: เกิดอุบัติเหตุรุนแรง, ผู้ป่วยฉุกเฉินวิกฤตที่ต้องการทีมแพทย์กู้ชีพขั้นสูง\n\nสิ่งที่ต้องทำ:\n1. แจ้งลักษณะอุบัติเหตุและอาการผู้ป่วย\n2. บอกพิกัดให้ชัดเจน\n3. ห้ามเคลื่อนย้ายผู้ป่วยเองหากไม่จำเป็น (โดยเฉพาะผู้บาดเจ็บที่คอหรือกระดูก)'
+            ),
+            _buildContactBox(
+              context, 
+              Icons.directions_car, '1137', 'JS100 Radio',
+              'จส.100 (คลื่นวิทยุข่าวสารและการจราจร) รับแจ้งอุบัติเหตุบนท้องถนน ขอความช่วยเหลือกรณีรถเสีย แจ้งของหาย/เก็บของได้ หรือสอบถามเส้นทางจราจร',
+              'ใช้เมื่อ: รถเสีย, อุบัติเหตุบนถนน, ลืมของบนแท็กซี่, หรือพบสิ่งกีดขวางจราจร\n\nสิ่งที่ต้องทำ:\n1. แจ้งพิกัดถนน/กิโลเมตร/จุดสังเกต\n2. กรณีของหาย: แจ้งสีรถ ทะเบียน และเวลาเกิดเหตุ\n3. หากรถเสีย ให้เปิดไฟฉุกเฉินและหลบเข้าข้างทาง'
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildContactBox(BuildContext context, IconData icon, String number, String name) {
+  // ปรับฟังก์ชันให้รับค่ารายละเอียดต่างๆ ส่งไปหน้า Detail ด้วย
+  Widget _buildContactBox(BuildContext context, IconData icon, String number, String name, String description, String tips) {
     return InkWell(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => EmergencyDetailScreen(number: number, name: name),
+            builder: (context) => EmergencyDetailScreen(
+              number: number, 
+              name: name,
+              description: description,
+              tips: tips,
+            ),
           ),
         );
       },
       borderRadius: BorderRadius.circular(16),
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFFFFE066), // สีเหลืองตามดีไซน์
+          color: const Color(0xFFFFE066),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 50, color: Colors.black),
+            Icon(icon, size: 45, color: Colors.black),
             const SizedBox(height: 8),
-            Text(number, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            Text(name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            Text(number, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
           ],
         ),
       ),
@@ -70,17 +102,27 @@ class EmergencyContactScreen extends StatelessWidget {
 class EmergencyDetailScreen extends StatelessWidget {
   final String number;
   final String name;
+  final String description; // รับคำอธิบายหน่วยงาน
+  final String tips;        // รับข้อควรรู้
 
-  const EmergencyDetailScreen({super.key, required this.number, required this.name});
+  const EmergencyDetailScreen({
+    super.key, 
+    required this.number, 
+    required this.name,
+    required this.description,
+    required this.tips,
+  });
 
-  // ฟังก์ชันสำหรับเชื่อมต่อไปยังแอปโทรศัพท์ของเครื่อง
+  // แก้ไขฟังก์ชันโทรออก: เอา canLaunchUrl ออก เพื่อบังคับข้ามระบบความปลอดภัยใน Emulator
   Future<void> _makePhoneCall(String phoneNumber) async {
     final Uri launchUri = Uri(
       scheme: 'tel',
       path: phoneNumber,
     );
-    if (await canLaunchUrl(launchUri)) {
-      await launchUrl(launchUri);
+    try {
+      await launchUrl(launchUri); // บังคับให้มือถือพยายามเปิดแอปโทรศัพท์ทันที
+    } catch (e) {
+      debugPrint('ไม่สามารถโทรออกได้: $e');
     }
   }
 
@@ -124,10 +166,11 @@ class EmergencyDetailScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const Text(
-                    'เบอร์ 1669 คือสายด่วนสถาบันการแพทย์ฉุกเฉินแห่งชาติ\n(สพฉ.) ให้บริการ "เจ็บป่วยฉุกเฉินวิกฤต"\nฟรีตลอด 24 ชั่วโมง ทั่วไทย\nเมื่อเกิดอุบัติเหตุหรือผู้ป่วยวิกฤต (สีแดง/เหลือง)\nให้ตั้งสติ โทร 1669 แจ้งอาการ สถานที่เกิดเหตุชัดเจน\nเจ้าหน้าที่จะประเมินและส่งทีมกู้ชีพเข้าช่วยเหลือทันที',
+                  // แสดงคำอธิบายเฉพาะของเบอร์นั้นๆ
+                  Text(
+                    description,
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14),
+                    style: const TextStyle(fontSize: 14),
                   ),
                 ],
               ),
@@ -140,7 +183,7 @@ class EmergencyDetailScreen extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.phone_in_talk, size: 80, color: Colors.black87),
+                  const Icon(Icons.phone_in_talk, size: 60, color: Colors.black87),
                   const SizedBox(width: 16),
                   Container(
                     decoration: const BoxDecoration(
@@ -148,7 +191,7 @@ class EmergencyDetailScreen extends StatelessWidget {
                     ),
                     child: Text(
                       number,
-                      style: const TextStyle(fontSize: 80, fontWeight: FontWeight.bold, color: Colors.blue),
+                      style: const TextStyle(fontSize: 60, fontWeight: FontWeight.bold, color: Colors.blue),
                     ),
                   ),
                 ],
@@ -166,14 +209,15 @@ class EmergencyDetailScreen extends StatelessWidget {
                 border: Border.all(color: Colors.black),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Column(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('ข้อควรรู้เมื่อโทร $number', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  SizedBox(height: 8),
+                  Text('ข้อควรรู้เมื่อโทร $number', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(height: 8),
+                  // แสดงข้อควรรู้เฉพาะของเบอร์นั้นๆ
                   Text(
-                    'ใช้เมื่อฉุกเฉินจริง: เจ็บแน่นหน้าอก, หายใจไม่ออก, หมดสติ,\nเลือดออกมาก, อุบัติเหตุรุนแรง\nสิ่งที่ต้องทำในสถานการณ์จริง: 1. ตั้งสติ บอกสถานที่เกิดเหตุ/จุดสังเกตที่ชัดเจน\n2. แจ้งอาการเจ็บป่วย/บาดเจ็บ ระดับความรู้สึกตัว\n3. แจ้งจำนวนผู้ป่วย/เพศ/อายุ\n4. บอกชื่อและเบอร์โทรที่ติดต่อได้\n5. ทำตามคำแนะนำเจ้าหน้าที่และรอทีมกู้ชีพ\nหมายเหตุ: ไม่ควรโทรเล่น เพราะเป็นการตัดโอกาสผู้ป่วยวิกฤตรายอื่น',
-                    style: TextStyle(fontSize: 12),
+                    tips,
+                    style: const TextStyle(fontSize: 12),
                   ),
                 ],
               ),

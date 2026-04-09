@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'signup_screen.dart';
+import '../emergency/medical_id_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -15,6 +17,21 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscureText = true;
   bool _rememberMe = false;
   bool _isEmailLogin = true;
+  
+  bool _showEmergencyButton = true; 
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEmergencySetting(); 
+  }
+
+  Future<void> _loadEmergencySetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _showEmergencyButton = prefs.getBool('showEmergencyInfo') ?? true;
+    });
+  }
 
   @override
   void dispose() {
@@ -122,18 +139,36 @@ class _LoginScreenState extends State<LoginScreen> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                         onPressed: () {
-                          // --- ส่วนที่เพิ่มระบบตรวจสอบ ---
+                          // 1. เช็คว่ากรอกข้อมูลหรือยัง
                           if (_usernameController.text.trim().isEmpty || _passwordController.text.trim().isEmpty) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('กรุณากรอกข้อมูลให้ครบถ้วน'),
-                                backgroundColor: Colors.red,
-                              ),
+                              const SnackBar(content: Text('กรุณากรอกข้อมูลให้ครบถ้วน'), backgroundColor: Colors.red),
                             );
-                            return; // ถ้าข้อมูลว่าง ให้หยุดการทำงานตรงนี้ ไม่ไปหน้าถัดไป
+                            return; 
                           }
 
-                          // ถ้าผ่านเงื่อนไขด้านบนมาได้ ค่อยพาไปหน้าหลัก
+                          // 2. เช็ครูปแบบ (Validation)
+                          if (_isEmailLogin) {
+                            // ตรวจสอบอีเมล (ต้องมี @ และ .)
+                            final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                            if (!emailRegex.hasMatch(_usernameController.text.trim())) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('รูปแบบอีเมลไม่ถูกต้อง'), backgroundColor: Colors.red),
+                              );
+                              return;
+                            }
+                          } else {
+                            // ตรวจสอบเบอร์โทร (ลบขีดออกก่อนเช็ค, ต้องขึ้นต้นด้วย 0 และมี 10 ตัว)
+                            String phoneRaw = _usernameController.text.replaceAll(RegExp(r'\D'), '');
+                            if (!RegExp(r'^0\d{9}$').hasMatch(phoneRaw)) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('เบอร์โทรศัพท์ต้องเริ่มต้นด้วย 0 และมี 10 หลัก'), backgroundColor: Colors.red),
+                              );
+                              return;
+                            }
+                          }
+
+                          // ถ้าผ่านทุกด่าน ให้ไปหน้าหลัก
                           Navigator.pushReplacementNamed(context, '/main');
                         },
                         child: const Text('Login', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFFFFD700))),
@@ -157,6 +192,34 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
+
+                    if (_showEmergencyButton) ...[
+                      const SizedBox(height: 32),
+                      const Divider(thickness: 1, color: Colors.grey),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const MedicalIdScreen(isEmergencyMode: true)),
+                            );
+                          },
+                          icon: const Icon(Icons.health_and_safety, color: Colors.red, size: 28),
+                          label: const Text(
+                            'Emergency Info (Medical ID)', 
+                            style: TextStyle(color: Colors.red, fontSize: 16, fontWeight: FontWeight.bold)
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.red, width: 2),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            backgroundColor: Colors.red.withOpacity(0.05), 
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

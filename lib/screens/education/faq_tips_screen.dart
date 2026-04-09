@@ -24,7 +24,7 @@ class FaqTipsScreen extends StatelessWidget {
         children: const [
           FaqItem(
             title: 'ถ้าเจองูในตึกจะทำยังไง?',
-            content: '1. ห้ามเข้าใกล้\n2. สังเกตลักษณะของงู\n3. แจ้ง รปภ. หรือ ศูนย์ควบคุมสัตว์',
+            content: '1. ห้ามเข้าใกล้ และอย่าพยายามตีหรือจับเองเด็ดขาด\n2. สังเกตลักษณะของงู (สี, ลาย, ขนาด) เพื่อเป็นข้อมูล\n3. คอยดูทิศทางที่งูหนีไปอยู่ห่างๆ\n4. แจ้ง รปภ. หรือ ศูนย์ควบคุมสัตว์ (199) ทันที',
             emojiIcon: '🐍',
           ),
           FaqItem(
@@ -34,18 +34,34 @@ class FaqTipsScreen extends StatelessWidget {
           ),
           FaqItem(
             title: 'AED ใช้กับ เด็ก ได้ไหม?',
-            content: '1. ได้ (ถ้ามีโหมดเด็ก / แผ่นแปะเด็ก)\n2. ถ้าไม่มี : ปรับระดับพลังงานต่ำลง',
+            content: '1. ได้ (ถ้ามีโหมดเด็ก หรือ แผ่นแปะสำหรับเด็กให้ใช้ก่อน)\n2. ถ้าไม่มี: สามารถใช้แผ่นแปะผู้ใหญ่ได้ โดยแปะที่กลางหน้าอก 1 แผ่น และกลางหลัง 1 แผ่น (ไม่ให้แผ่นสัมผัสกัน)',
           ),
-          // คุณสามารถเพิ่ม FaqItem เรื่องอื่นๆ ต่อตรงนี้ได้เลย
+          FaqItem(
+            title: 'เมื่อเกิดเพลิงไหม้ (หลักการ PASS)',
+            content: 'การใช้ถังดับเพลิงให้จำหลัก PASS:\n• P (Pull): ดึงสลักนิรภัยออก\n• A (Aim): เล็งหัวฉีดไปที่ฐานของไฟ\n• S (Squeeze): กดบีบไกฉีด\n• S (Sweep): ส่ายหัวฉีดไปมาซ้ายขวาจนไฟดับ',
+            emojiIcon: '🧯',
+          ),
+          FaqItem(
+            title: 'เมื่อสารเคมีหกใส่ร่างกาย',
+            content: '1. ถอดเสื้อผ้าส่วนที่เปื้อนสารเคมีออกทันที\n2. ล้างบริเวณที่สัมผัสด้วยน้ำสะอาดที่ไหลผ่านอย่างต่อเนื่อง (อย่างน้อย 15-20 นาที)\n3. ห้ามใช้สารแก้ล้าง (Neutralizer) หากไม่ทราบชนิดสารเคมีที่ชัดเจน\n4. รีบไปพบแพทย์พร้อมนำฉลากสารเคมีไปด้วย',
+            emojiIcon: '🧪',
+          ),
+          FaqItem(
+            title: 'หากลิฟต์ค้างต้องทำอย่างไร?',
+            content: '1. ตั้งสติ อย่าตกใจ ลิฟต์มีระบบระบายอากาศ\n2. กดปุ่มกระดิ่งฉุกเฉิน (Emergency Bell) หรือปุ่ม Intercom เพื่อติดต่อเจ้าหน้าที่\n3. ห้ามพยายามงัดประตูลิฟต์หรือปีนออกทางเพดานเด็ดขาด\n4. รอคอยการช่วยเหลือจากช่างผู้เชี่ยวชาญ',
+            icon: Icons.elevator,
+          ),
+          FaqItem(
+            title: 'การปฐมพยาบาลคนเป็นลมแดด (Heatstroke)',
+            content: '1. รีบพาผู้ป่วยเข้าที่ร่มและมีอากาศถ่ายเท\n2. ให้นอนราบ ยกเท้าสูง คลายเสื้อผ้าให้หลวม\n3. ใช้ผ้าชุบน้ำเย็นเช็ดตัว โดยเฉพาะข้อพับ ขาหนีบ รักแร้ คอ เพื่อระบายความร้อน\n4. หากหมดสติให้รีบโทร 1669 ทันที',
+            emojiIcon: '🥵',
+          ),
         ],
       ),
     );
   }
 }
 
-// ---------------------------------------------------------
-// Custom Widget สำหรับสร้างกล่องข้อความที่กดเปิด-ปิดได้
-// ---------------------------------------------------------
 class FaqItem extends StatefulWidget {
   final String title;
   final String content;
@@ -65,7 +81,7 @@ class FaqItem extends StatefulWidget {
 }
 
 class _FaqItemState extends State<FaqItem> {
-  bool _isExpanded = true; // ค่าเริ่มต้นให้กางออกเหมือนในดีไซน์
+  bool _isExpanded = false;
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +95,6 @@ class _FaqItemState extends State<FaqItem> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- ส่วนหัว (สีเหลืองมะนาว) ---
           GestureDetector(
             onTap: () {
               setState(() {
@@ -89,7 +104,7 @@ class _FaqItemState extends State<FaqItem> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFFDCE775), // สีเหลืองมะนาวตามรูป
+                color: const Color(0xFFDCE775),
                 borderRadius: _isExpanded
                     ? const BorderRadius.vertical(top: Radius.circular(6.5))
                     : BorderRadius.circular(6.5),
@@ -100,7 +115,7 @@ class _FaqItemState extends State<FaqItem> {
                   Expanded(
                     child: Text(
                       widget.title,
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                   ),
                   Icon(
@@ -112,8 +127,6 @@ class _FaqItemState extends State<FaqItem> {
               ),
             ),
           ),
-          
-          // --- ส่วนเนื้อหา (สีขาว) ---
           if (_isExpanded)
             Container(
               padding: const EdgeInsets.all(16),
@@ -126,17 +139,15 @@ class _FaqItemState extends State<FaqItem> {
                   Expanded(
                     child: Text(
                       widget.content,
-                      style: const TextStyle(fontSize: 15, height: 1.5, color: Colors.black87),
+                      style: const TextStyle(fontSize: 14, height: 1.5, color: Colors.black87),
                     ),
                   ),
-                  
-                  // แสดงรูปไอคอน หรือ อิโมจิ ด้านขวา (ถ้ามีการใส่ค่ามา)
                   if (widget.emojiIcon != null) ...[
                     const SizedBox(width: 12),
                     Text(widget.emojiIcon!, style: const TextStyle(fontSize: 40)),
                   ] else if (widget.icon != null) ...[
                     const SizedBox(width: 12),
-                    Icon(widget.icon, size: 50, color: Colors.red[700]), // สีแดงสำหรับกล่องพยาบาล
+                    Icon(widget.icon, size: 50, color: Colors.red[700]),
                   ]
                 ],
               ),

@@ -1,6 +1,8 @@
-import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HazardReporterScreen extends StatefulWidget {
   const HazardReporterScreen({super.key});
@@ -10,7 +12,7 @@ class HazardReporterScreen extends StatefulWidget {
 }
 
 class _HazardReporterScreenState extends State<HazardReporterScreen> {
-  File? _selectedImage;
+  Uint8List? _imageBytes; // ใช้ Uint8List เก็บรูปแทน File เพื่อให้รองรับทั้ง Web และ Mobile
   final ImagePicker _picker = ImagePicker();
 
   final TextEditingController _nameController = TextEditingController();
@@ -29,12 +31,13 @@ class _HazardReporterScreenState extends State<HazardReporterScreen> {
     super.dispose();
   }
 
-  // ฟังก์ชันเลือกรูปภาพ (รับค่าว่าเป็น กล้อง หรือ แกลลอรี่)
+  // ฟังก์ชันเลือกรูปภาพ (แปลงเป็น Bytes อัตโนมัติ)
   Future<void> _pickImage(ImageSource source) async {
     final XFile? image = await _picker.pickImage(source: source);
     if (image != null) {
+      final bytes = await image.readAsBytes();
       setState(() {
-        _selectedImage = File(image.path);
+        _imageBytes = bytes;
       });
     }
   }
@@ -70,6 +73,39 @@ class _HazardReporterScreenState extends State<HazardReporterScreen> {
     );
   }
 
+  // ฟังก์ชันเซฟข้อมูลลงเครื่อง
+  Future<void> _saveReport() async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    // ดึงประวัติเก่าที่มีอยู่ (ถ้ามี)
+    List<String> reports = prefs.getStringList('hazard_reports') ?? [];
+
+    // กำหนดวันที่อัตโนมัติถ้าไม่ได้กรอก
+    String reportDate = _dateTimeController.text.isNotEmpty 
+        ? _dateTimeController.text 
+        : "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year} ${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}";
+
+    // แปลงรูปเป็น Base64 String
+    String base64Image = _imageBytes != null ? base64Encode(_imageBytes!) : "";
+
+    // สร้างข้อมูล Report 1 ชุดเป็นรูปแบบ Map (JSON)
+    Map<String, dynamic> newReport = {
+      'title': _typeController.text.isEmpty ? 'ไม่ระบุประเภท' : _typeController.text,
+      'location': _locationController.text,
+      'date': reportDate,
+      'details': _detailsController.text,
+      'image': base64Image,
+      'statusEn': 'Received',
+      'statusTh': 'รับเรื่องแล้ว',
+    };
+
+    // นำรายงานใหม่แปลงเป็น String แล้วต่อท้ายใน List
+    reports.add(jsonEncode(newReport));
+    
+    // บันทึกกลับลงเครื่อง
+    await prefs.setStringList('hazard_reports', reports);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -98,11 +134,11 @@ class _HazardReporterScreenState extends State<HazardReporterScreen> {
                 width: double.infinity,
                 decoration: BoxDecoration(
                   color: Colors.grey[300],
-                  border: Border(bottom: BorderSide(color: const Color(0xFFFFD700), width: 4)),
+                  border: const Border(bottom: BorderSide(color: Color(0xFFFFD700), width: 4)),
                 ),
-                child: _selectedImage != null
-                    ? Image.file(
-                        _selectedImage!,
+                child: _imageBytes != null
+                    ? Image.memory(
+                        _imageBytes!,
                         fit: BoxFit.cover,
                       )
                     : Column(
@@ -149,7 +185,7 @@ class _HazardReporterScreenState extends State<HazardReporterScreen> {
                   
                   const SizedBox(height: 12),
                   _buildLabel('วันเวลาที่พบ'),
-                  _buildTextField('เช่น 10 March 2026, 14:30', _dateTimeController),
+                  _buildTextField('ปล่อยว่างเพื่อใช้วันเวลาปัจจุบัน', _dateTimeController),
                   
                   const SizedBox(height: 12),
                   _buildLabel('ประเภทของเหตุ'),
@@ -173,30 +209,41 @@ class _HazardReporterScreenState extends State<HazardReporterScreen> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        // ตรวจสอบว่ากรอกข้อมูลหรือยัง
-                        if (_nameController.text.isEmpty || _locationController.text.isEmpty) {
+                      onPressed: () async {
+                        // ตรวจสอบข้อมูลบังคับ
+                        if (_nameController.text.isEmpty || _locationController.text.isEmpty || _typeController.text.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('กรุณากรอกข้อมูลให้ครบถ้วน'), backgroundColor: Colors.red),
+                            const SnackBar(content: Text('กรุณากรอก ชื่อผู้แจ้ง, สถานที่ และประเภทของเหตุ ให้ครบถ้วน'), backgroundColor: Colors.red),
                           );
                           return;
                         }
                         
-                        if (_selectedImage == null) {
+                        if (_imageBytes == null) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('กรุณาแนบรูปภาพประกอบการแจ้งเหตุ'), backgroundColor: Colors.red),
                           );
                           return;
                         }
 
-                        // ถ้าผ่าน ไปหน้าความสำเร็จ
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (context) => const HazardSuccessScreen()),
-                        );
+                        // แสดงหน้าโหลดชั่วคราว
+                        showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
+                        
+                        // เซฟข้อมูล
+                        await _saveReport();
+
+                        // ปิดหน้าโหลด
+                        if (context.mounted) Navigator.pop(context);
+
+                        // ไปหน้าความสำเร็จ
+                        if (context.mounted) {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(builder: (context) => const HazardSuccessScreen()),
+                          );
+                        }
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF4A00E0), // สีม่วงสว่างแบบในดีไซน์
+                        backgroundColor: const Color(0xFF4A00E0),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                       ),
@@ -235,7 +282,7 @@ class _HazardReporterScreenState extends State<HazardReporterScreen> {
 }
 
 // ---------------------------------------------------------
-// หน้าจอส่งรายงานสำเร็จ (แยกออกมาเพื่อความสวยงามตามดีไซน์)
+// หน้าจอส่งรายงานสำเร็จ
 // ---------------------------------------------------------
 class HazardSuccessScreen extends StatelessWidget {
   const HazardSuccessScreen({super.key});
@@ -258,13 +305,12 @@ class HazardSuccessScreen extends StatelessWidget {
       ),
       body: Column(
         children: [
-          // รูปตึกมหิดลด้านบน
           Container(
             height: 200,
             width: double.infinity,
             decoration: const BoxDecoration(
                image: DecorationImage(
-                 image: AssetImage('assets/banner.png'), // ใช้รูปแบนเนอร์เดียวกับหน้าแรก
+                 image: AssetImage('assets/banner.png'), 
                  fit: BoxFit.cover,
                ),
             ),
@@ -277,7 +323,6 @@ class HazardSuccessScreen extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // ไอคอนเครื่องหมายถูกสีเขียว
                   Container(
                     width: 120,
                     height: 120,
@@ -301,7 +346,6 @@ class HazardSuccessScreen extends StatelessWidget {
                   
                   OutlinedButton(
                     onPressed: () {
-                      // กลับไปยังหน้าแรกสุด
                       Navigator.popUntil(context, ModalRoute.withName('/main'));
                     },
                     style: OutlinedButton.styleFrom(
