@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // นำเข้า Firebase Auth
+import 'package:cloud_firestore/cloud_firestore.dart'; // นำเข้า Firestore
+
 import 'signup_screen.dart';
 import '../emergency/medical_id_screen.dart';
 
@@ -17,19 +20,24 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscureText = true;
   bool _rememberMe = false;
   bool _isEmailLogin = true;
-  
   bool _showEmergencyButton = true; 
+  bool _isLoading = false; 
 
   @override
   void initState() {
     super.initState();
-    _loadEmergencySetting(); 
+    _loadSettings(); 
   }
 
-  Future<void> _loadEmergencySetting() async {
+  Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _showEmergencyButton = prefs.getBool('showEmergencyInfo') ?? true;
+      _rememberMe = prefs.getBool('rememberMe') ?? false;
+      if (_rememberMe) {
+        _isEmailLogin = prefs.getBool('saved_is_email') ?? true;
+        _usernameController.text = prefs.getString('saved_username') ?? '';
+      }
     });
   }
 
@@ -48,6 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
         child: SingleChildScrollView(
           child: Column(
             children: [
+              // --- Header ---
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 30),
@@ -56,10 +65,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   border: Border(bottom: BorderSide(color: Color(0xFFFFD700), width: 6)),
                 ),
                 child: const Center(
-                  child: Text(
-                    'MU SAFE CAMPUS',
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFFFFD700)),
-                  ),
+                  child: Text('MU SAFE CAMPUS', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFFFFD700))),
                 ),
               ),
               
@@ -68,18 +74,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      _isEmailLogin ? 'อีเมล์มหาวิทยาลัย' : 'เบอร์โทรศัพท์', 
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)
-                    ),
+                    Text(_isEmailLogin ? 'อีเมลมหาวิทยาลัย' : 'เบอร์โทรศัพท์', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _usernameController,
                       keyboardType: _isEmailLogin ? TextInputType.emailAddress : TextInputType.phone,
                       decoration: InputDecoration(
-                        hintText: _isEmailLogin ? 'กรอกอีเมล์' : 'กรอกเบอร์โทรศัพท์',
-                        filled: true,
-                        fillColor: Colors.grey[300],
+                        hintText: _isEmailLogin ? 'กรอกอีเมล' : 'กรอกเบอร์โทรศัพท์',
+                        filled: true, fillColor: Colors.grey[300],
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide.none),
                       ),
                     ),
@@ -92,8 +94,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       obscureText: _obscureText,
                       decoration: InputDecoration(
                         hintText: 'กรอกรหัสผ่าน',
-                        filled: true,
-                        fillColor: Colors.grey[300],
+                        filled: true, fillColor: Colors.grey[300],
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide.none),
                         suffixIcon: IconButton(
                           icon: Icon(_obscureText ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
@@ -108,28 +109,23 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: () {
                           setState(() {
                             _isEmailLogin = !_isEmailLogin;
-                            _usernameController.clear(); 
+                            if (!_rememberMe) _usernameController.clear(); 
                           });
                         },
-                        child: Text(
-                          _isEmailLogin ? 'ล็อคอินด้วยเบอร์โทรศัพท์' : 'ล็อคอินด้วยอีเมล์มหาวิทยาลัย',
-                          style: const TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
-                        ),
+                        child: Text(_isEmailLogin ? 'เข้าสู่ระบบด้วยเบอร์โทรศัพท์' : 'เข้าสู่ระบบด้วยอีเมลมหาวิทยาลัย', style: const TextStyle(color: Colors.blue, decoration: TextDecoration.underline)),
                       ),
                     ),
 
                     Row(
                       children: [
-                        Checkbox(
-                          value: _rememberMe,
-                          onChanged: (value) => setState(() => _rememberMe = value!),
-                          activeColor: Colors.black,
-                        ),
+                        Checkbox(value: _rememberMe, onChanged: (value) => setState(() => _rememberMe = value!), activeColor: Colors.black),
                         const Text('จดจำฉัน', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       ],
                     ),
                     
                     const SizedBox(height: 20),
+                    
+                    // --- ปุ่ม Login (Firebase) ---
                     SizedBox(
                       width: double.infinity,
                       height: 50,
@@ -138,40 +134,68 @@ class _LoginScreenState extends State<LoginScreen> {
                           backgroundColor: const Color(0xFF1D0A45),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
-                        onPressed: () {
-                          // 1. เช็คว่ากรอกข้อมูลหรือยัง
+                        onPressed: _isLoading ? null : () async {
+                          // 1. Validation
                           if (_usernameController.text.trim().isEmpty || _passwordController.text.trim().isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('กรุณากรอกข้อมูลให้ครบถ้วน'), backgroundColor: Colors.red),
-                            );
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('กรุณากรอกข้อมูลให้ครบถ้วน'), backgroundColor: Colors.red));
                             return; 
                           }
 
-                          // 2. เช็ครูปแบบ (Validation)
-                          if (_isEmailLogin) {
-                            // ตรวจสอบอีเมล (ต้องมี @ และ .)
-                            final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-                            if (!emailRegex.hasMatch(_usernameController.text.trim())) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('รูปแบบอีเมลไม่ถูกต้อง'), backgroundColor: Colors.red),
-                              );
-                              return;
+                          setState(() => _isLoading = true);
+
+                          try {
+                            String loginEmail = _usernameController.text.trim();
+
+                            // 2. ถ้ายูสเซอร์เลือกโหมดเบอร์โทร ให้ไปค้นหา Email จาก Database ก่อน
+                            if (!_isEmailLogin) {
+                              String phoneRaw = loginEmail.replaceAll(RegExp(r'\D'), '');
+                              var snapshot = await FirebaseFirestore.instance.collection('users').where('phone', isEqualTo: phoneRaw).limit(1).get();
+                              
+                              if (snapshot.docs.isNotEmpty) {
+                                loginEmail = snapshot.docs.first.data()['email']; // ดึงอีเมลออกมาล็อกอิน
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ไม่พบเบอร์โทรศัพท์นี้ในระบบ'), backgroundColor: Colors.red));
+                                setState(() => _isLoading = false);
+                                return;
+                              }
                             }
-                          } else {
-                            // ตรวจสอบเบอร์โทร (ลบขีดออกก่อนเช็ค, ต้องขึ้นต้นด้วย 0 และมี 10 ตัว)
-                            String phoneRaw = _usernameController.text.replaceAll(RegExp(r'\D'), '');
-                            if (!RegExp(r'^0\d{9}$').hasMatch(phoneRaw)) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('เบอร์โทรศัพท์ต้องเริ่มต้นด้วย 0 และมี 10 หลัก'), backgroundColor: Colors.red),
-                              );
-                              return;
+
+                            // 3. เข้าสู่ระบบผ่าน Firebase ด้วยอีเมลและรหัสผ่าน
+                            await FirebaseAuth.instance.signInWithEmailAndPassword(
+                              email: loginEmail,
+                              password: _passwordController.text,
+                            );
+
+                            // 4. บันทึกข้อมูล "จดจำฉัน" ลง SharedPreferences
+                            final prefs = await SharedPreferences.getInstance();
+                            if (_rememberMe) {
+                              await prefs.setBool('rememberMe', true);
+                              await prefs.setString('saved_username', _usernameController.text.trim());
+                              await prefs.setBool('saved_is_email', _isEmailLogin);
+                            } else {
+                              await prefs.setBool('rememberMe', false);
+                              await prefs.remove('saved_username');
+                              await prefs.remove('saved_is_email');
                             }
+
+                            // ไปยังหน้าหลัก
+                            if (mounted) Navigator.pushReplacementNamed(context, '/main');
+
+                          } on FirebaseAuthException catch (e) {
+                            String errorMsg = 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ';
+                            if (e.code == 'user-not-found' || e.code == 'wrong-password' || e.code == 'invalid-credential') {
+                              errorMsg = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
+                            }
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorMsg), backgroundColor: Colors.red));
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์'), backgroundColor: Colors.red));
                           }
 
-                          // ถ้าผ่านทุกด่าน ให้ไปหน้าหลัก
-                          Navigator.pushReplacementNamed(context, '/main');
+                          setState(() => _isLoading = false);
                         },
-                        child: const Text('Login', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFFFFD700))),
+                        child: _isLoading 
+                            ? const CircularProgressIndicator(color: Color(0xFFFFD700))
+                            : const Text('Login', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFFFFD700))),
                       ),
                     ),
                     

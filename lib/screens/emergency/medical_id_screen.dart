@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // นำเข้า Firebase Auth
+import 'package:cloud_firestore/cloud_firestore.dart'; // นำเข้า Firestore
 
 class MedicalIdScreen extends StatefulWidget {
   final bool isEmergencyMode; 
@@ -16,8 +18,8 @@ class MedicalIdScreen extends StatefulWidget {
 
 class _MedicalIdScreenState extends State<MedicalIdScreen> {
   late bool _isEditing;
+  bool _isLoading = false; // ตัวแปรสำหรับโชว์สถานะโหลดข้อมูล
 
-  // เปลี่ยนจาก File เป็น Uint8List เพื่อให้รองรับการโชว์รูปบน Web
   Uint8List? _imageBytes; 
   final ImagePicker _picker = ImagePicker();
 
@@ -44,13 +46,58 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSavedData();
     _isEditing = !widget.isEmergencyMode;
+    _fetchData(); // เรียกใช้ฟังก์ชันดึงข้อมูลแบบใหม่
   }
 
-  // --- ฟังก์ชันดึงข้อมูลจากเครื่อง ---
-  Future<void> _loadSavedData() async {
+  // --- ฟังก์ชันดึงข้อมูล (Firebase + Local) ---
+  Future<void> _fetchData() async {
+    setState(() => _isLoading = true);
     final prefs = await SharedPreferences.getInstance();
+
+    // 1. ถ้าอยู่ในโหมดปกติ (ล็อกอินแล้ว) ให้ลองดึงข้อมูลจาก Firebase มาอัปเดตเครื่องก่อน
+    if (!widget.isEmergencyMode) {
+      try {
+        User? currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          DocumentSnapshot doc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
+          
+          if (doc.exists) {
+            var data = doc.data() as Map<String, dynamic>;
+            // อัปเดตข้อมูลจาก Cloud ลงในเครื่อง (SharedPreferences) เพื่อใช้ตอนฉุกเฉิน
+            await prefs.setString('med_name', data['name'] ?? '');
+            await prefs.setString('med_phone', data['phone'] ?? '');
+            await prefs.setString('med_age', data['age'] ?? '');
+            await prefs.setString('med_address', data['address'] ?? '');
+            
+            await prefs.setString('med_bloodChoice', data['med_bloodChoice'] ?? 'ไม่ทราบ / ไม่เคยตรวจ');
+            await prefs.setString('med_bloodDetail', data['med_bloodDetail'] ?? '');
+            
+            await prefs.setString('med_diseaseChoice', data['med_diseaseChoice'] ?? 'ไม่มี');
+            await prefs.setString('med_diseaseDetail', data['med_diseaseDetail'] ?? '');
+            
+            await prefs.setString('med_drugChoice', data['med_drugChoice'] ?? 'ไม่แพ้');
+            await prefs.setString('med_drugDetail', data['med_drugDetail'] ?? '');
+            
+            await prefs.setString('med_foodChoice', data['med_foodChoice'] ?? 'ไม่แพ้');
+            await prefs.setString('med_foodDetail', data['med_foodDetail'] ?? '');
+
+            await prefs.setString('med_emName', data['med_emName'] ?? '');
+            await prefs.setString('med_emRel', data['med_emRel'] ?? '');
+            await prefs.setString('med_emAddress', data['med_emAddress'] ?? '');
+            await prefs.setString('med_emPhone', data['med_emPhone'] ?? '');
+
+            if (data['med_imageBytes'] != null) {
+              await prefs.setString('med_imageBytes', data['med_imageBytes']);
+            }
+          }
+        }
+      } catch (e) {
+        print("Firebase fetch error: $e"); // ปล่อยผ่านไปใช้ข้อมูลเก่าในเครื่อง
+      }
+    }
+
+    // 2. โหลดข้อมูลจาก SharedPreferences มาโชว์ที่หน้าจอ (ทำงานเสมอทั้งโหมดปกติและฉุกเฉิน)
     setState(() {
       _nameController.text = prefs.getString('med_name') ?? '';
       _phoneController.text = prefs.getString('med_phone') ?? '';
@@ -74,7 +121,6 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
       _emAddressController.text = prefs.getString('med_emAddress') ?? '';
       _emPhoneController.text = prefs.getString('med_emPhone') ?? '';
 
-      // ดึงข้อมูลรูปภาพที่แปลงเป็น String ไว้กลับมาเป็นรูปภาพ
       String? base64Image = prefs.getString('med_imageBytes');
       if (base64Image != null && base64Image.isNotEmpty) {
         _imageBytes = base64Decode(base64Image);
@@ -83,39 +129,74 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
       if (!widget.isEmergencyMode && _nameController.text.isNotEmpty) {
         _isEditing = false;
       }
+      _isLoading = false;
     });
   }
 
-  // --- ฟังก์ชันบันทึกข้อมูลลงเครื่อง ---
-  Future<void> _saveDataLocally() async {
+  // --- ฟังก์ชันบันทึกข้อมูล (อัปขึ้น Firebase + เซฟลงเครื่อง) ---
+  Future<void> _saveData() async {
+    setState(() => _isLoading = true);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('med_name', _nameController.text);
-    await prefs.setString('med_phone', _phoneController.text);
-    await prefs.setString('med_age', _ageController.text);
-    await prefs.setString('med_address', _addressController.text);
-    
+
+    String base64Image = _imageBytes != null ? base64Encode(_imageBytes!) : "";
+
+    // 1. เซฟลงเครื่องเพื่อแบ็คอัป (ทำงานเสมอ)
+    await prefs.setString('med_name', _nameController.text.trim());
+    await prefs.setString('med_phone', _phoneController.text.trim());
+    await prefs.setString('med_age', _ageController.text.trim());
+    await prefs.setString('med_address', _addressController.text.trim());
     await prefs.setString('med_bloodChoice', _bloodChoice);
-    await prefs.setString('med_bloodDetail', _bloodDetailController.text);
-    
+    await prefs.setString('med_bloodDetail', _bloodDetailController.text.trim());
     await prefs.setString('med_diseaseChoice', _diseaseChoice);
-    await prefs.setString('med_diseaseDetail', _diseaseDetailController.text);
-    
+    await prefs.setString('med_diseaseDetail', _diseaseDetailController.text.trim());
     await prefs.setString('med_drugChoice', _drugChoice);
-    await prefs.setString('med_drugDetail', _drugDetailController.text);
-    
+    await prefs.setString('med_drugDetail', _drugDetailController.text.trim());
     await prefs.setString('med_foodChoice', _foodChoice);
-    await prefs.setString('med_foodDetail', _foodDetailController.text);
+    await prefs.setString('med_foodDetail', _foodDetailController.text.trim());
+    await prefs.setString('med_emName', _emNameController.text.trim());
+    await prefs.setString('med_emRel', _emRelController.text.trim());
+    await prefs.setString('med_emAddress', _emAddressController.text.trim());
+    await prefs.setString('med_emPhone', _emPhoneController.text.trim());
+    if (base64Image.isNotEmpty) await prefs.setString('med_imageBytes', base64Image);
 
-    await prefs.setString('med_emName', _emNameController.text);
-    await prefs.setString('med_emRel', _emRelController.text);
-    await prefs.setString('med_emAddress', _emAddressController.text);
-    await prefs.setString('med_emPhone', _emPhoneController.text);
+    // 2. อัปโหลดขึ้น Firebase (ทำงานเฉพาะตอนไม่ได้อยู่โหมดฉุกเฉิน)
+    if (!widget.isEmergencyMode) {
+      try {
+        User? currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          Map<String, dynamic> medData = {
+            'name': _nameController.text.trim(),
+            'phone': _phoneController.text.trim(),
+            'age': _ageController.text.trim(),
+            'address': _addressController.text.trim(),
+            'med_bloodChoice': _bloodChoice,
+            'med_bloodDetail': _bloodDetailController.text.trim(),
+            'med_diseaseChoice': _diseaseChoice,
+            'med_diseaseDetail': _diseaseDetailController.text.trim(),
+            'med_drugChoice': _drugChoice,
+            'med_drugDetail': _drugDetailController.text.trim(),
+            'med_foodChoice': _foodChoice,
+            'med_foodDetail': _foodDetailController.text.trim(),
+            'med_emName': _emNameController.text.trim(),
+            'med_emRel': _emRelController.text.trim(),
+            'med_emAddress': _emAddressController.text.trim(),
+            'med_emPhone': _emPhoneController.text.trim(),
+          };
+          
+          if (base64Image.isNotEmpty) medData['med_imageBytes'] = base64Image;
 
-    // แปลงรูปภาพเป็นข้อความ Base64 เพื่อเซฟลง SharedPreferences (รองรับทั้ง Web และ Mobile)
-    if (_imageBytes != null) {
-      String base64Image = base64Encode(_imageBytes!);
-      await prefs.setString('med_imageBytes', base64Image);
+          // เซฟลง Collection 'users' (เพื่อแชร์ข้อมูลชื่อ-เบอร์กับหน้า Profile)
+          await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).set(medData, SetOptions(merge: true));
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('บันทึกลง Cloud ไม่สำเร็จ แต่ข้อมูลถูกบันทึกในเครื่องแล้ว'), backgroundColor: Colors.orange));
+      }
     }
+
+    setState(() {
+      _isEditing = false;
+      _isLoading = false;
+    });
   }
 
   @override
@@ -135,19 +216,20 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
     super.dispose();
   }
 
-  // แก้ไขฟังก์ชันเลือกรูปให้อ่านเป็น Bytes
   Future<void> _pickImage() async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
       final bytes = await image.readAsBytes();
-      setState(() {
-        _imageBytes = bytes;
-      });
+      setState(() => _imageBytes = bytes);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(backgroundColor: Colors.white, body: Center(child: CircularProgressIndicator(color: Color(0xFF1D0A45))));
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -179,7 +261,6 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // โชว์รูปกลมๆ เล็กๆ ในหน้าแก้ไขด้วย เพื่อให้รู้ว่าเลือกรูปแล้ว
           Center(
             child: GestureDetector(
               onTap: _pickImage,
@@ -288,8 +369,7 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
                   }
                 }
 
-                await _saveDataLocally();
-                setState(() => _isEditing = false);
+                await _saveData(); // เรียกใช้งานฟังก์ชันที่เซฟทั้ง Cloud และ Local
               },
               icon: const Icon(Icons.send, color: Colors.white),
               label: const Text('Save & Show Card', style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
@@ -309,7 +389,6 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
           CircleAvatar(
             radius: 80,
             backgroundColor: Colors.grey[300],
-            // ใช้ MemoryImage แทน FileImage
             backgroundImage: _imageBytes != null ? MemoryImage(_imageBytes!) : null,
             child: _imageBytes == null ? const Icon(Icons.person, size: 80, color: Colors.white) : null,
           ),

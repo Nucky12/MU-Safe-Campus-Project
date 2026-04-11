@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // นำเข้า Firebase Auth
+import 'package:cloud_firestore/cloud_firestore.dart'; // นำเข้า Firestore
 
 class ReportHistoryScreen extends StatefulWidget {
   const ReportHistoryScreen({super.key});
@@ -16,25 +17,49 @@ class _ReportHistoryScreenState extends State<ReportHistoryScreen> {
   @override
   void initState() {
     super.initState();
-    _loadHistory();
+    _loadHistoryFromFirebase();
   }
 
-  // ฟังก์ชันดึงประวัติรายงานที่เซฟไว้ขึ้นมาโชว์
-  Future<void> _loadHistory() async {
-    final prefs = await SharedPreferences.getInstance();
-    List<String> reportsJson = prefs.getStringList('hazard_reports') ?? [];
-    
-    if (reportsJson.isNotEmpty) {
+  // --- ฟังก์ชันดึงประวัติจาก Firebase ---
+  Future<void> _loadHistoryFromFirebase() async {
+    try {
+      User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // ดึงข้อมูลจาก Collection 'reports' เฉพาะที่ userId ตรงกับคนที่ล็อกอินอยู่
+      QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('reports')
+          .where('userId', isEqualTo: currentUser.uid)
+          .get();
+
+      List<Map<String, dynamic>> fetchedReports = [];
+
+      for (var doc in snapshot.docs) {
+        var data = doc.data() as Map<String, dynamic>;
+        
+        // เก็บ Timestamp ไว้ใช้สำหรับเรียงลำดับเวลา (อันใหม่สุดขึ้นก่อน)
+        data['sortTime'] = data['createdAt'] != null 
+            ? (data['createdAt'] as Timestamp).millisecondsSinceEpoch 
+            : 0;
+            
+        fetchedReports.add(data);
+      }
+
+      // เรียงลำดับจากเหตุการณ์ล่าสุดไปเก่าสุด
+      fetchedReports.sort((a, b) => b['sortTime'].compareTo(a['sortTime']));
+
       setState(() {
-        // แปลงกลับจาก Text เป็น Map และจัดเรียงให้รายงานล่าสุดขึ้นด้านบน
-        _reports = reportsJson.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
-        _reports = _reports.reversed.toList();
+        _reports = fetchedReports;
+        _isLoading = false;
       });
+
+    } catch (e) {
+      print("Error loading history: $e");
+      setState(() => _isLoading = false);
     }
-    
-    setState(() {
-      _isLoading = false;
-    });
   }
 
   @override
@@ -54,7 +79,7 @@ class _ReportHistoryScreenState extends State<ReportHistoryScreen> {
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF1D0A45)))
           : _reports.isEmpty
               ? _buildEmptyState()
               : ListView.builder(
@@ -71,7 +96,6 @@ class _ReportHistoryScreenState extends State<ReportHistoryScreen> {
     );
   }
 
-  // หน้าจอแสดงตอนที่ยังไม่เคยแจ้งเหตุเลย
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -89,7 +113,6 @@ class _ReportHistoryScreenState extends State<ReportHistoryScreen> {
   }
 
   Widget _buildReportCard(Map<String, dynamic> report) {
-    // ถ้ามีรูปที่เซฟไว้ให้แปลงข้อความกลับมาเป็นรูปภาพ
     final imageBase64 = report['image'] as String? ?? '';
     final hasImage = imageBase64.isNotEmpty;
 
@@ -104,7 +127,6 @@ class _ReportHistoryScreenState extends State<ReportHistoryScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ช่องใส่รูปภาพ
             Container(
               width: 120,
               height: 90,
@@ -124,7 +146,6 @@ class _ReportHistoryScreenState extends State<ReportHistoryScreen> {
                   : Icon(Icons.image_not_supported, size: 40, color: Colors.grey[600]),
             ),
             const SizedBox(width: 12),
-            // ข้อมูลด้านขวา
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -164,12 +185,11 @@ class _ReportHistoryScreenState extends State<ReportHistoryScreen> {
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
-                  // ป้ายสถานะ
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade500, // สีเทา (เพิ่งรับเรื่อง)
+                      color: Colors.grey.shade500, 
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: Colors.black54),
                     ),

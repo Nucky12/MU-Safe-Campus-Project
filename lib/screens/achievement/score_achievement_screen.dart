@@ -1,49 +1,115 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // นำเข้า Firebase Auth
+import 'package:cloud_firestore/cloud_firestore.dart'; // นำเข้า Firestore
 
-// ==========================================
-// 1. คลาสโครงสร้างข้อมูลคะแนนแต่ละหมวดหมู่
-// ==========================================
-class QuizScore {
-  final String title;
-  final int score;
-  final int total;
-  final IconData icon;
-  final Color color;
-
-  QuizScore({
-    required this.title,
-    required this.score,
-    required this.total,
-    required this.icon,
-    required this.color,
-  });
-
-  double get percentage => score / total;
-  bool get isPerfect => score == total; // เช็คว่าได้คะแนนเต็มหรือไม่
-}
-
-// ==========================================
-// 2. หน้าจอแสดงผลคะแนนและเหรียญรางวัล
-// ==========================================
-class ScoreAchievementScreen extends StatelessWidget {
+class ScoreAchievementScreen extends StatefulWidget {
   const ScoreAchievementScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // ข้อมูลจำลอง (Mock Data) - ในอนาคตสามารถดึงจาก Database มาใส่ตรงนี้ได้
-    final List<QuizScore> myScores = [
-      QuizScore(title: 'Quiz 1: การปฐมพยาบาล', score: 3, total: 3, icon: Icons.medical_services, color: Colors.green), // เต็ม (จะไม่แสดงในรายการทบทวน)
-      QuizScore(title: 'Quiz 2: การรับมืออัคคีภัย', score: 5, total: 10, icon: Icons.fire_extinguisher, color: Colors.orange), // ไม่เต็ม
-      QuizScore(title: 'Quiz 3: สัตว์มีพิษ', score: 4, total: 7, icon: Icons.pest_control, color: Colors.red), // ไม่เต็ม
+  State<ScoreAchievementScreen> createState() => _ScoreAchievementScreenState();
+}
+
+class _ScoreAchievementScreenState extends State<ScoreAchievementScreen> {
+  String _userName = 'ยังไม่ได้ระบุชื่อ';
+  Uint8List? _userImage;
+
+  int totalUserScore = 0;
+  int totalPossibleScore = 0;
+  List<Map<String, dynamic>> categoryStats = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAllData();
+  }
+
+  // --- โหลดข้อมูลจาก Firebase และ Local ---
+  Future<void> _loadAllData() async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    // 1. พยายามดึงคะแนนล่าสุดจาก Firebase ก่อน (ถ้ามีเน็ต)
+    try {
+      User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        DocumentSnapshot doc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
+        if (doc.exists) {
+          var data = doc.data() as Map<String, dynamic>;
+
+          // อัปเดตชื่อและรูปในเครื่อง
+          if (data['name'] != null) await prefs.setString('med_name', data['name']);
+          if (data['med_imageBytes'] != null) await prefs.setString('med_imageBytes', data['med_imageBytes']);
+
+          // ดึงคะแนน Quiz จาก Map มาอัปเดตลงเครื่อง
+          if (data['quizScores'] != null) {
+            Map<String, dynamic> scores = data['quizScores'];
+            scores.forEach((key, value) async {
+              await prefs.setInt(key, value as int);
+            });
+          }
+        }
+      }
+    } catch (e) {
+      print("Error fetching scores from Firebase: $e"); // ถ้าพังให้ปล่อยผ่านไปใช้ข้อมูลที่เคยเซฟไว้
+    }
+
+    // 2. โหลดและคำนวณจาก SharedPreferences (เพื่อแสดงผล)
+    String? name = prefs.getString('med_name');
+    String? base64Image = prefs.getString('med_imageBytes');
+    
+    int tempTotal = 0;
+    int tempMax = 0;
+    List<Map<String, dynamic>> tempStats = [];
+
+    List<String> categories = [
+      'Basic First Aid', 
+      'CPR & AED', 
+      'Fire Safety', 
+      'Campus Safety', 
+      'Wildlife & Animal', 
+      'Emergency Protocols'
     ];
+    
+    for (String cat in categories) {
+      int catScore = 0;
+      int catMax = 0;
+      
+      for (int i = 1; i <= 5; i++) {
+        String key = "score_${cat}_Quiz $i";
+        catScore += prefs.getInt(key) ?? 0;
+        catMax += prefs.getInt("${key}_total") ?? 0;
+      }
 
-    // คำนวณคะแนนรวม
-    int totalScore = myScores.fold(0, (sum, item) => sum + item.score);
-    int totalPossible = myScores.fold(0, (sum, item) => sum + item.total);
-    double totalPercentage = totalPossible > 0 ? (totalScore / totalPossible) : 0.0;
+      tempTotal += catScore;
+      tempMax += catMax;
 
-    // คัดกรองเฉพาะควิซที่ยังได้คะแนนไม่เต็ม
-    final List<QuizScore> needsReviewScores = myScores.where((quiz) => !quiz.isPerfect).toList();
+      tempStats.add({
+        'title': cat,
+        'score': catScore,
+        'total': catMax,
+        'percentage': catMax > 0 ? catScore / catMax : 0.0,
+      });
+    }
+
+    setState(() {
+      _userName = (name == null || name.isEmpty) ? 'ยังไม่ได้ระบุชื่อ' : name;
+      if (base64Image != null && base64Image.isNotEmpty) {
+        _userImage = base64Decode(base64Image);
+      }
+      
+      totalUserScore = tempTotal;
+      totalPossibleScore = tempMax;
+      categoryStats = tempStats;
+      isLoading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    double totalPercentage = totalPossibleScore > 0 ? totalUserScore / totalPossibleScore : 0.0;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -54,153 +120,134 @@ class ScoreAchievementScreen extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text('Safety Badge', style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold)),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(4.0),
-          child: Container(color: const Color(0xFFFFD700), height: 4.0),
-        ),
+        elevation: 0,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // --- ส่วนที่ 1: กราฟวงกลมแสดงคะแนนรวม ---
-            const Text('คะแนนรวมของฉัน', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1D0A45))),
-            const SizedBox(height: 24),
-            
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                // วงกลม Progress Bar
-                SizedBox(
-                  width: 160,
-                  height: 160,
-                  child: CircularProgressIndicator(
-                    value: totalPercentage,
-                    strokeWidth: 16,
-                    backgroundColor: Colors.grey[200],
-                    color: const Color(0xFFFFD700), // สีเหลืองทอง
+      body: isLoading 
+        ? const Center(child: CircularProgressIndicator(color: Color(0xFF1D0A45)))
+        : RefreshIndicator(
+            onRefresh: _loadAllData, // ดึงจอลงเพื่อโหลดข้อมูลจากเซิร์ฟเวอร์ใหม่
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                children: [
+                  _buildProfileHeader(),
+                  
+                  const SizedBox(height: 32),
+                  const Text('ความแม่นยำโดยรวม', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 20),
+                  
+                  _buildCircularScore(totalPercentage),
+                  
+                  const SizedBox(height: 40),
+                  const Divider(thickness: 1.5),
+                  const SizedBox(height: 16),
+                  
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('สรุปความแม่นยำรายหมวดหมู่', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1D0A45))),
                   ),
-                ),
-                // ตัวหนังสือเปอร์เซ็นต์ตรงกลาง
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '${(totalPercentage * 100).toInt()}%',
-                      style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Color(0xFF1D0A45)),
-                    ),
-                    Text(
-                      '$totalScore / $totalPossible',
-                      style: const TextStyle(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  
+                  ...categoryStats.map((stat) => _buildCategoryStatCard(stat)),
+                  
+                  const SizedBox(height: 40),
+                ],
+              ),
             ),
-            const SizedBox(height: 24),
-            
-            // ข้อความให้กำลังใจตามเกณฑ์คะแนน
-            Text(
-              totalPercentage == 1.0 
-                  ? 'ยอดเยี่ยมมาก! คุณคือผู้เชี่ยวชาญด้านความปลอดภัย'
-                  : totalPercentage >= 0.6 
-                      ? 'ทำได้ดีมาก! พยายามอีกนิดนะ'
-                      : 'อย่าเพิ่งท้อ! ลองทบทวนความรู้ดูใหม่นะ',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: totalPercentage >= 0.6 ? Colors.green : Colors.orange),
-              textAlign: TextAlign.center,
-            ),
-            
-            const SizedBox(height: 32),
-            const Divider(thickness: 2),
-            const SizedBox(height: 16),
-
-            // --- ส่วนที่ 2: รายการหมวดหมู่ที่ต้องทบทวน (เฉพาะที่คะแนนไม่เต็ม) ---
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text('หมวดหมู่ที่ต้องทบทวน', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.redAccent)),
-            ),
-            const SizedBox(height: 16),
-
-            if (needsReviewScores.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(24.0),
-                child: Text('ยินดีด้วย! คุณทำคะแนนเต็มครบทุกหมวดหมู่แล้ว 🎉', style: TextStyle(fontSize: 16, color: Colors.green), textAlign: TextAlign.center),
-              )
-            else
-              ...needsReviewScores.map((quiz) => _buildReviewCard(context, quiz)),
-
-          ],
-        ),
-      ),
+          ),
     );
   }
 
-  // Widget สำหรับสร้างการ์ดแต่ละอัน
-  Widget _buildReviewCard(BuildContext context, QuizScore quiz) {
+  Widget _buildProfileHeader() {
+    return Column(
+      children: [
+        CircleAvatar(
+          radius: 50,
+          backgroundColor: Colors.grey[200],
+          backgroundImage: _userImage != null ? MemoryImage(_userImage!) : null,
+          child: _userImage == null ? const Icon(Icons.person, size: 50, color: Colors.grey) : null,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          _userName, 
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1D0A45)),
+        ),
+        const Text('ผู้พิทักษ์ความปลอดภัยในวิทยาเขต', style: TextStyle(color: Colors.grey, fontSize: 14)),
+      ],
+    );
+  }
+
+  Widget _buildCircularScore(double percent) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        SizedBox(
+          width: 170, 
+          height: 170, 
+          child: CircularProgressIndicator(
+            value: percent, 
+            strokeWidth: 15, 
+            backgroundColor: Colors.grey[200], 
+            color: const Color(0xFFFFD700),
+          )
+        ),
+        Column(
+          children: [
+            Text('${(percent * 100).toInt()}%', style: const TextStyle(fontSize: 45, fontWeight: FontWeight.bold, color: Color(0xFF1D0A45))),
+            if (totalPossibleScore > 0)
+              Text('ทำถูก $totalUserScore / $totalPossibleScore', style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+            if (totalPossibleScore == 0)
+              const Text('ยังไม่มีประวัติการทำควิซ', style: TextStyle(color: Colors.grey, fontSize: 12)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCategoryStatCard(Map<String, dynamic> stat) {
+    int percent = (stat['percentage'] * 100).toInt();
+    bool hasPlayed = stat['total'] > 0;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.grey[300]!),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5, offset: const Offset(0, 2)),
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),
         ],
       ),
       child: Column(
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: quiz.color.withOpacity(0.2), shape: BoxShape.circle),
-                child: Icon(quiz.icon, color: quiz.color, size: 30),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(quiz.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    Text('คะแนน: ${quiz.score} / ${quiz.total}', style: const TextStyle(fontSize: 14, color: Colors.grey)),
-                  ],
-                ),
-              ),
+              Text(stat['title'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               Text(
-                '${(quiz.percentage * 100).toInt()}%',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: quiz.color),
+                hasPlayed ? '$percent%' : '0%', 
+                style: TextStyle(fontWeight: FontWeight.bold, color: hasPlayed ? const Color(0xFF4A00E0) : Colors.grey, fontSize: 18)
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          // แถบหลอดคะแนนแนวนอน
+          const SizedBox(height: 8),
           LinearProgressIndicator(
-            value: quiz.percentage,
-            minHeight: 8,
+            value: stat['percentage'], 
+            minHeight: 10, 
+            borderRadius: BorderRadius.circular(5), 
+            color: const Color(0xFF4A00E0),
             backgroundColor: Colors.grey[200],
-            color: quiz.color,
-            borderRadius: BorderRadius.circular(4),
           ),
-          const SizedBox(height: 16),
-          // ปุ่มทำแบบทดสอบอีกครั้ง
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                // TODO: นำทางไปยังหน้า QuizScreen หรือ ActiveQuizScreen ที่ตรงกับหมวดหมู่นั้น
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('กำลังเปิด ${quiz.title}...')));
-              },
-              icon: const Icon(Icons.refresh, color: Color(0xFF1D0A45)),
-              label: const Text('ทำแบบทดสอบอีกครั้ง', style: TextStyle(color: Color(0xFF1D0A45), fontWeight: FontWeight.bold)),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFF1D0A45)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          if (hasPlayed)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Text('ทำถูก ${stat['score']} จาก ${stat['total']} ข้อ', style: const TextStyle(fontSize: 11, color: Colors.grey)),
               ),
             ),
-          ),
         ],
       ),
     );

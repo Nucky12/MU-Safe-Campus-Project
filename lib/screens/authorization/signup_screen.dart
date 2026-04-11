@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // นำเข้า Firebase Auth
+import 'package:cloud_firestore/cloud_firestore.dart'; // นำเข้า Firestore Database
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -17,6 +19,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _acceptTerms = false;
+  bool _isLoading = false; 
 
   @override
   void dispose() {
@@ -53,8 +56,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
             _buildTextField('กรอกชื่อ - นามสกุล', controller: _nameController),
             const SizedBox(height: 16),
             
-            _buildLabel('อีเมล์มหาวิทยาลัยมหิดล'),
-            _buildTextField('กรอกอีเมล์มหาวิทยาลัย', controller: _emailController, keyboardType: TextInputType.emailAddress),
+            _buildLabel('อีเมลมหาวิทยาลัยมหิดล'),
+            _buildTextField('กรอกอีเมลมหาวิทยาลัย', controller: _emailController, keyboardType: TextInputType.emailAddress),
             const SizedBox(height: 16),
             
             _buildLabel('เบอร์โทรศัพท์'),
@@ -87,6 +90,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
             ),
             const SizedBox(height: 24),
             
+            // --- ปุ่ม Sign Up (Firebase) ---
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -95,69 +99,87 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   backgroundColor: const Color(0xFF1D0A45),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                onPressed: () {
+                onPressed: _isLoading ? null : () async {
                   
-                  // 1. เช็คว่ากรอกครบทุกช่องหรือไม่
+                  // 1. Validation (ตรวจสอบข้อมูล)
                   if (_nameController.text.trim().isEmpty || 
                       _emailController.text.trim().isEmpty || 
                       _phoneController.text.trim().isEmpty || 
                       _passwordController.text.trim().isEmpty || 
                       _confirmPasswordController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('กรุณากรอกข้อมูลให้ครบทุกช่อง'), backgroundColor: Colors.red),
-                    );
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('กรุณากรอกข้อมูลให้ครบทุกช่อง'), backgroundColor: Colors.red));
                     return;
                   }
 
-                  // 2. เช็คชื่อ-นามสกุล (ห้ามมีตัวเลข)
                   if (RegExp(r'[0-9]').hasMatch(_nameController.text.trim())) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('ชื่อ-นามสกุล ต้องไม่มีตัวเลขผสมอยู่'), backgroundColor: Colors.red),
-                    );
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ชื่อ-นามสกุล ต้องไม่มีตัวเลขผสมอยู่'), backgroundColor: Colors.red));
                     return;
                   }
 
-                  // 3. เช็คอีเมล (ต้องมี @ และรูปแบบถูกต้อง)
                   final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
                   if (!emailRegex.hasMatch(_emailController.text.trim())) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('รูปแบบอีเมลไม่ถูกต้อง (ต้องมี @)'), backgroundColor: Colors.red),
-                    );
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('รูปแบบอีเมลไม่ถูกต้อง (ต้องมี @)'), backgroundColor: Colors.red));
                     return;
                   }
 
-                  // 4. เช็คเบอร์โทรศัพท์ (เริ่มต้นด้วย 0 และมี 10 หลัก)
-                  String phoneRaw = _phoneController.text.replaceAll(RegExp(r'\D'), ''); // ลบขีด/เว้นวรรคออกก่อนเช็ค
+                  String phoneRaw = _phoneController.text.replaceAll(RegExp(r'\D'), ''); 
                   if (!RegExp(r'^0\d{9}$').hasMatch(phoneRaw)) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('เบอร์โทรศัพท์ต้องเริ่มต้นด้วย 0 และมี 10 หลัก'), backgroundColor: Colors.red),
-                    );
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('เบอร์โทรศัพท์ต้องเริ่มต้นด้วย 0 และมี 10 หลัก'), backgroundColor: Colors.red));
                     return;
                   }
 
-                  // 5. เช็ครหัสผ่าน 2 ช่องว่าตรงกันหรือไม่
                   if (_passwordController.text != _confirmPasswordController.text) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('รหัสผ่านไม่ตรงกัน กรุณาตรวจสอบอีกครั้ง'), backgroundColor: Colors.red),
-                    );
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('รหัสผ่านไม่ตรงกัน กรุณาตรวจสอบอีกครั้ง'), backgroundColor: Colors.red));
                     return;
                   }
 
-                  // 6. เช็คว่ากดยอมรับเงื่อนไขหรือยัง
                   if (!_acceptTerms) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('กรุณากดยอมรับข้อกำหนดและนโยบายความเป็นส่วนตัว'), backgroundColor: Colors.red),
-                    );
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('กรุณากดยอมรับข้อกำหนดและนโยบายความเป็นส่วนตัว'), backgroundColor: Colors.red));
                     return;
                   }
 
-                  // ถ้าผ่านทุกเงื่อนไข
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('ลงทะเบียนสำเร็จ!'), backgroundColor: Colors.green),
-                  );
-                  Navigator.pop(context);
+                  // 2. สมัครสมาชิกผ่าน Firebase
+                  setState(() => _isLoading = true);
+
+                  try {
+                    // สร้างบัญชีผู้ใช้ (ใช้ Authentication)
+                    UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+                      email: _emailController.text.trim(),
+                      password: _passwordController.text,
+                    );
+
+                    // เก็บข้อมูลโปรไฟล์ลงฐานข้อมูล (ใช้ Firestore)
+                    await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
+                      'name': _nameController.text.trim(),
+                      'email': _emailController.text.trim(),
+                      'phone': phoneRaw,
+                      'role': 'student',
+                      'createdAt': FieldValue.serverTimestamp(),
+                    });
+
+                    setState(() => _isLoading = false);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ลงทะเบียนสำเร็จ! กรุณาเข้าสู่ระบบ'), backgroundColor: Colors.green));
+                      Navigator.pop(context); // กลับไปหน้า Login
+                    }
+
+                  } on FirebaseAuthException catch (e) {
+                    setState(() => _isLoading = false);
+                    String errorMsg = 'เกิดข้อผิดพลาดในการลงทะเบียน';
+                    if (e.code == 'weak-password') {
+                      errorMsg = 'รหัสผ่านอ่อนเกินไป (ต้อง 6 ตัวอักษรขึ้นไป)';
+                    } else if (e.code == 'email-already-in-use') {
+                      errorMsg = 'อีเมลนี้ถูกใช้งานไปแล้ว';
+                    }
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorMsg), backgroundColor: Colors.red));
+                  } catch (e) {
+                    setState(() => _isLoading = false);
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์'), backgroundColor: Colors.red));
+                  }
                 },
-                child: const Text('Sign up', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFFFFD700))),
+                child: _isLoading 
+                    ? const CircularProgressIndicator(color: Color(0xFFFFD700))
+                    : const Text('Sign up', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFFFFD700))),
               ),
             ),
             const SizedBox(height: 16),

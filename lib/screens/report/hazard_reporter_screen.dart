@@ -2,7 +2,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // นำเข้า Firebase Auth
+import 'package:cloud_firestore/cloud_firestore.dart'; // นำเข้า Firestore
 
 class HazardReporterScreen extends StatefulWidget {
   const HazardReporterScreen({super.key});
@@ -12,7 +13,7 @@ class HazardReporterScreen extends StatefulWidget {
 }
 
 class _HazardReporterScreenState extends State<HazardReporterScreen> {
-  Uint8List? _imageBytes; // ใช้ Uint8List เก็บรูปแทน File เพื่อให้รองรับทั้ง Web และ Mobile
+  Uint8List? _imageBytes; 
   final ImagePicker _picker = ImagePicker();
 
   final TextEditingController _nameController = TextEditingController();
@@ -31,7 +32,6 @@ class _HazardReporterScreenState extends State<HazardReporterScreen> {
     super.dispose();
   }
 
-  // ฟังก์ชันเลือกรูปภาพ (แปลงเป็น Bytes อัตโนมัติ)
   Future<void> _pickImage(ImageSource source) async {
     final XFile? image = await _picker.pickImage(source: source);
     if (image != null) {
@@ -42,7 +42,6 @@ class _HazardReporterScreenState extends State<HazardReporterScreen> {
     }
   }
 
-  // ฟังก์ชันแสดงเมนูเลือกรูปภาพด้านล่างจอ
   void _showImageSourceActionSheet() {
     showModalBottomSheet(
       context: context,
@@ -73,37 +72,43 @@ class _HazardReporterScreenState extends State<HazardReporterScreen> {
     );
   }
 
-  // ฟังก์ชันเซฟข้อมูลลงเครื่อง
-  Future<void> _saveReport() async {
-    final prefs = await SharedPreferences.getInstance();
-    
-    // ดึงประวัติเก่าที่มีอยู่ (ถ้ามี)
-    List<String> reports = prefs.getStringList('hazard_reports') ?? [];
+  // --- ฟังก์ชันเซฟข้อมูลขึ้น Firebase ---
+  Future<bool> _saveReport() async {
+    try {
+      // 1. ดึงข้อมูล User ที่กำลังล็อกอิน
+      User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return false;
 
-    // กำหนดวันที่อัตโนมัติถ้าไม่ได้กรอก
-    String reportDate = _dateTimeController.text.isNotEmpty 
-        ? _dateTimeController.text 
-        : "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year} ${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}";
+      // 2. กำหนดวันที่อัตโนมัติถ้าไม่ได้กรอก
+      String reportDate = _dateTimeController.text.isNotEmpty 
+          ? _dateTimeController.text 
+          : "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year} ${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}";
 
-    // แปลงรูปเป็น Base64 String
-    String base64Image = _imageBytes != null ? base64Encode(_imageBytes!) : "";
+      // 3. แปลงรูปเป็น Base64 String
+      String base64Image = _imageBytes != null ? base64Encode(_imageBytes!) : "";
 
-    // สร้างข้อมูล Report 1 ชุดเป็นรูปแบบ Map (JSON)
-    Map<String, dynamic> newReport = {
-      'title': _typeController.text.isEmpty ? 'ไม่ระบุประเภท' : _typeController.text,
-      'location': _locationController.text,
-      'date': reportDate,
-      'details': _detailsController.text,
-      'image': base64Image,
-      'statusEn': 'Received',
-      'statusTh': 'รับเรื่องแล้ว',
-    };
+      // 4. สร้าง Map ข้อมูลเพื่อส่งขึ้น Firebase
+      Map<String, dynamic> newReport = {
+        'userId': currentUser.uid, // เก็บ UID เพื่อให้รู้ว่าใครแจ้ง
+        'reporterName': _nameController.text.trim(),
+        'title': _typeController.text.isEmpty ? 'ไม่ระบุประเภท' : _typeController.text,
+        'location': _locationController.text,
+        'date': reportDate,
+        'details': _detailsController.text,
+        'image': base64Image,
+        'statusEn': 'Received',
+        'statusTh': 'รับเรื่องแล้ว',
+        'createdAt': FieldValue.serverTimestamp(), // แสตมป์เวลาเซิร์ฟเวอร์
+      };
 
-    // นำรายงานใหม่แปลงเป็น String แล้วต่อท้ายใน List
-    reports.add(jsonEncode(newReport));
-    
-    // บันทึกกลับลงเครื่อง
-    await prefs.setStringList('hazard_reports', reports);
+      // 5. บันทึกลง Collection 'reports' ใน Firestore
+      await FirebaseFirestore.instance.collection('reports').add(newReport);
+      return true;
+
+    } catch (e) {
+      print('Error saving report: $e');
+      return false;
+    }
   }
 
   @override
@@ -210,36 +215,36 @@ class _HazardReporterScreenState extends State<HazardReporterScreen> {
                     alignment: Alignment.centerRight,
                     child: ElevatedButton.icon(
                       onPressed: () async {
-                        // ตรวจสอบข้อมูลบังคับ
                         if (_nameController.text.isEmpty || _locationController.text.isEmpty || _typeController.text.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('กรุณากรอก ชื่อผู้แจ้ง, สถานที่ และประเภทของเหตุ ให้ครบถ้วน'), backgroundColor: Colors.red),
-                          );
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('กรุณากรอก ชื่อผู้แจ้ง, สถานที่ และประเภทของเหตุ ให้ครบถ้วน'), backgroundColor: Colors.red));
                           return;
                         }
                         
                         if (_imageBytes == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('กรุณาแนบรูปภาพประกอบการแจ้งเหตุ'), backgroundColor: Colors.red),
-                          );
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('กรุณาแนบรูปภาพประกอบการแจ้งเหตุ'), backgroundColor: Colors.red));
                           return;
                         }
 
                         // แสดงหน้าโหลดชั่วคราว
                         showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
                         
-                        // เซฟข้อมูล
-                        await _saveReport();
+                        // เซฟข้อมูลขึ้น Firebase
+                        bool isSuccess = await _saveReport();
 
                         // ปิดหน้าโหลด
                         if (context.mounted) Navigator.pop(context);
 
-                        // ไปหน้าความสำเร็จ
-                        if (context.mounted) {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(builder: (context) => const HazardSuccessScreen()),
-                          );
+                        if (isSuccess) {
+                          if (context.mounted) {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(builder: (context) => const HazardSuccessScreen()),
+                            );
+                          }
+                        } else {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('เกิดข้อผิดพลาดในการส่งข้อมูล กรุณาลองใหม่'), backgroundColor: Colors.red));
+                          }
                         }
                       },
                       style: ElevatedButton.styleFrom(
@@ -282,7 +287,7 @@ class _HazardReporterScreenState extends State<HazardReporterScreen> {
 }
 
 // ---------------------------------------------------------
-// หน้าจอส่งรายงานสำเร็จ
+// หน้าจอส่งรายงานสำเร็จ (คงเดิม)
 // ---------------------------------------------------------
 class HazardSuccessScreen extends StatelessWidget {
   const HazardSuccessScreen({super.key});

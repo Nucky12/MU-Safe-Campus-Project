@@ -1,5 +1,11 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // เพิ่มตัวนี้
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // นำเข้า Firebase Auth
+import 'package:cloud_firestore/cloud_firestore.dart'; // นำเข้า Firestore
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -9,59 +15,110 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // ข้อมูลจำลอง
-  String _name = 'นายสิรวิชญ์ น้อยเจริญ';
-  String _phone = '089-300-8212';
-  String _email = 'sirawit.noy@student.mahidol.ac.th';
-  String _studentId = '6787082';
-  String _faculty = 'ICT';
-  final String _score = '214'; 
+  String _name = '';
+  String _phone = '-';
+  String _email = '-';
+  String _studentId = '-';
+  String _faculty = '-';
+  int _totalScore = 0;
+  bool _showEmergencyInfo = false;
+  bool _isLoadingAPI = true; // แอนิเมชันโหลดข้อมูล
   
-  bool _showEmergencyInfo = true;
+  Uint8List? _imageBytes;
+  final ImagePicker _picker = ImagePicker();
+  final Color _iconYellow = const Color(0xFFD4E157);
 
   @override
   void initState() {
     super.initState();
-    _loadEmergencySetting(); // โหลดสถานะสวิตช์ตอนเข้ามาหน้าโปรไฟล์
+    _fetchProfileFromFirebase(); // เรียกใช้ฟังก์ชันโหลดข้อมูลจาก Firebase
   }
 
-  // ฟังก์ชันดึงค่าปัจจุบัน
-  Future<void> _loadEmergencySetting() async {
+  // --- โหลดข้อมูลจาก Firebase ---
+  Future<void> _fetchProfileFromFirebase() async {
+    setState(() => _isLoadingAPI = true);
     final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _showEmergencyInfo = prefs.getBool('showEmergencyInfo') ?? true;
-    });
-  }
 
-  // ฟังก์ชันบันทึกค่าลงเครื่อง
-  Future<void> _toggleEmergencyInfo(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('showEmergencyInfo', value); // เซฟค่า
-    setState(() {
-      _showEmergencyInfo = value;
-    });
-  }
+    try {
+      // 1. ดึง UID ของผู้ใช้ที่กำลังล็อกอินอยู่
+      User? currentUser = FirebaseAuth.instance.currentUser;
 
-  // ฟังก์ชันไปหน้าแก้ไขข้อมูล
-  void _navigateToEditProfile() async {
-    final updatedData = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => EditProfileScreen(
-          currentName: _name, currentPhone: _phone, currentEmail: _email, currentStudentId: _studentId, currentFaculty: _faculty,
-        ),
-      ),
-    );
+      if (currentUser != null) {
+        // 2. ดึงข้อมูลจากกล่อง (Document) ของผู้ใช้คนนั้นใน Firestore
+        DocumentSnapshot doc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
 
-    if (updatedData != null && updatedData is Map<String, String>) {
+        if (doc.exists) {
+          var data = doc.data() as Map<String, dynamic>;
+          setState(() {
+            _name = data['name'] ?? '';
+            _phone = data['phone'] ?? '-';
+            _email = data['email'] ?? '-';
+            _studentId = data['studentId'] ?? '-';
+            _faculty = data['faculty'] ?? '-';
+          });
+
+          // แบ็คอัปข้อมูลลงเครื่องเผื่อโหมด Offline
+          await prefs.setString('med_name', _name);
+          await prefs.setString('med_phone', _phone);
+          await prefs.setString('med_email', _email);
+          await prefs.setString('med_studentId', _studentId);
+          await prefs.setString('med_faculty', _faculty);
+        }
+      }
+    } catch (e) {
+      // หากเน็ตหลุดหรือมีปัญหา ให้ดึงข้อมูลเก่าจากในเครื่องมาแสดง
       setState(() {
-        _name = updatedData['name'] ?? _name;
-        _phone = updatedData['phone'] ?? _phone;
-        _email = updatedData['email'] ?? _email;
-        _studentId = updatedData['studentId'] ?? _studentId;
-        _faculty = updatedData['faculty'] ?? _faculty;
+        _name = prefs.getString('med_name') ?? '';
+        _phone = prefs.getString('med_phone') ?? '-';
+        _email = prefs.getString('med_email') ?? '-';
+        _studentId = prefs.getString('med_studentId') ?? '-';
+        _faculty = prefs.getString('med_faculty') ?? '-';
       });
     }
+
+    _calculateTotalScore(prefs); // ดึงคะแนน Quiz จากในเครื่อง
+
+    setState(() {
+      _showEmergencyInfo = prefs.getBool('showEmergencyInfo') ?? false;
+      String? base64Image = prefs.getString('med_imageBytes');
+      if (base64Image != null && base64Image.isNotEmpty) {
+        _imageBytes = base64Decode(base64Image);
+      }
+      _isLoadingAPI = false;
+    });
+  }
+
+  void _calculateTotalScore(SharedPreferences prefs) {
+    int scoreSum = 0;
+    List<String> categories = ['Basic First Aid', 'CPR & AED', 'Fire Safety', 'Campus Safety', 'Wildlife & Animal', 'Emergency Protocols'];
+    for (String cat in categories) {
+      for (int i = 1; i <= 5; i++) {
+        scoreSum += prefs.getInt("score_${cat}_Quiz $i") ?? 0;
+      }
+    }
+    setState(() => _totalScore = scoreSum);
+  }
+
+  Future<void> _pickImage() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      final bytes = await image.readAsBytes();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('med_imageBytes', base64Encode(bytes));
+      setState(() => _imageBytes = bytes);
+    }
+  }
+
+  Future<void> _toggleEmergencyInfo(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('showEmergencyInfo', value);
+    setState(() => _showEmergencyInfo = value);
+  }
+
+  void _navigateToEditProfile() async {
+    await Navigator.push(context, MaterialPageRoute(builder: (context) => EditProfileScreen(
+      currentName: _name, currentPhone: _phone, currentEmail: _email, currentStudentId: _studentId, currentFaculty: _faculty)));
+    _fetchProfileFromFirebase(); // กลับมาแล้วโหลดข้อมูลใหม่
   }
 
   void _logout() {
@@ -71,11 +128,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: const Text('ยืนยันการออกจากระบบ'),
         content: const Text('คุณต้องการออกจากระบบใช่หรือไม่?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก', style: TextStyle(color: Colors.grey))),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () {
-              Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+            onPressed: () async {
+              // ออกจากระบบผ่าน Firebase
+              await FirebaseAuth.instance.signOut(); 
+              if (context.mounted) Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
             },
             child: const Text('ออกจากระบบ', style: TextStyle(color: Colors.white)),
           ),
@@ -86,110 +145,105 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ระหว่างรอโหลดข้อมูลจากเซิร์ฟเวอร์
+    if (_isLoadingAPI) {
+      return const Scaffold(backgroundColor: Colors.white, body: Center(child: CircularProgressIndicator(color: Color(0xFF1D0A45))));
+    }
+
+    bool hasName = _name.isNotEmpty && _name != 'ยังไม่ได้ระบุชื่อ';
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: const Color(0xFF1D0A45),
-        automaticallyImplyLeading: false,
-        title: const Text('Profile', style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold)),
-        centerTitle: true,
+        elevation: 0,
+        leading: IconButton(icon: const Icon(Icons.arrow_back_ios, color: Color(0xFFFFD700)), onPressed: () => Navigator.pop(context)),
+        title: const Text('User Profile', style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold, fontSize: 26)),
       ),
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // ส่วนหัวโปรไฟล์ (รูปภาพ, ชื่อ, คะแนน)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              decoration: const BoxDecoration(
-                color: Color(0xFF1D0A45),
-                borderRadius: BorderRadius.only(bottomLeft: Radius.circular(30), bottomRight: Radius.circular(30)),
-              ),
-              child: Column(
-                children: [
-                  Stack(
-                    alignment: Alignment.bottomRight,
-                    children: [
-                      const CircleAvatar(radius: 50, backgroundColor: Colors.white, child: Icon(Icons.person, size: 60, color: Colors.grey)),
-                      Container(
-                        decoration: const BoxDecoration(color: Color(0xFFFFD700), shape: BoxShape.circle),
-                        padding: const EdgeInsets.all(6),
-                        child: const Icon(Icons.camera_alt, size: 20, color: Colors.black),
-                      ),
-                    ],
+            // --- 1. ส่วน Header และ รูปโปรไฟล์ ---
+            Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.bottomCenter,
+              children: [
+                Container(height: 90, decoration: const BoxDecoration(color: Color(0xFF1D0A45), borderRadius: BorderRadius.only(bottomLeft: Radius.circular(30), bottomRight: Radius.circular(30)))),
+                Positioned(
+                  bottom: -60,
+                  child: GestureDetector(
+                    onTap: _pickImage,
+                    child: CircleAvatar(
+                      radius: 66, backgroundColor: Colors.black87,
+                      child: CircleAvatar(radius: 65, backgroundColor: Colors.grey[200], backgroundImage: _imageBytes != null ? MemoryImage(_imageBytes!) : null, child: _imageBytes == null ? const Icon(Icons.person_outline, size: 90, color: Colors.black) : null),
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  Text(_name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                    decoration: BoxDecoration(color: const Color(0xFFFFD700), borderRadius: BorderRadius.circular(20)),
-                    child: Text('Score: $_score', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
+            const SizedBox(height: 70),
             
+            // --- 2. ส่วนชื่อและไอคอน Verified ---
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(hasName ? _name : 'User', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+                if (hasName) ...[const SizedBox(width: 8), const Icon(Icons.check_box, color: Colors.green, size: 28)]
+              ],
+            ),
+            const SizedBox(height: 20),
+            
+            // --- 3. ส่วน Card Grid (ออกแบบยืดหยุ่นป้องกัน Overflow) ---
             Padding(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
                 children: [
-                  _buildInfoRow(Icons.phone, 'เบอร์โทรศัพท์', _phone),
-                  const Divider(),
-                  _buildInfoRow(Icons.email, 'อีเมล์มหาวิทยาลัย', _email),
-                  const Divider(),
-                  _buildInfoRow(Icons.badge, 'รหัสนักศึกษา/บุคลากร', _studentId),
-                  const Divider(),
-                  _buildInfoRow(Icons.school, 'คณะ/หน่วยงาน', _faculty),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // ส่วนตั้งค่า เปิด-ปิด ข้อมูลฉุกเฉิน (ผูกกับฟังก์ชันเซฟ)
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: SwitchListTile(
-                      activeThumbColor: const Color(0xFF1D0A45),
-                      title: const Text('Emergency Info', style: TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: const Text('แสดง Medical ID บนหน้าจอเมื่อเกิดเหตุฉุกเฉิน (ไม่ต้องล็อกอิน)', style: TextStyle(fontSize: 12)),
-                      value: _showEmergencyInfo,
-                      onChanged: _toggleEmergencyInfo, // เปลี่ยนไปเรียกฟังก์ชันเซฟที่เราสร้างไว้
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(child: _buildScoreCard()),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildInfoCard(Icons.phone, 'Phone Number', _phone)),
+                      ],
                     ),
                   ),
-                  
-                  const SizedBox(height: 32),
-                  
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: OutlinedButton.icon(
-                      onPressed: _navigateToEditProfile,
-                      icon: const Icon(Icons.edit, color: Color(0xFF1D0A45)),
-                      label: const Text('Edit Profile', style: TextStyle(fontSize: 16, color: Color(0xFF1D0A45), fontWeight: FontWeight.bold)),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Color(0xFF1D0A45), width: 2),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
+                  const SizedBox(height: 12),
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(child: _buildInfoCard(Icons.person, 'Full Name', hasName ? _name : '-')),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildInfoCard(Icons.email, 'Email', _email)),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton.icon(
-                      onPressed: _logout,
-                      icon: const Icon(Icons.logout, color: Colors.white),
-                      label: const Text('Logout', style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.redAccent,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
+                  const SizedBox(height: 12),
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(child: _buildInfoCard(Icons.badge, 'Student ID', _studentId)),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildInfoCard(Icons.domain, 'Faculty', _faculty)),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 12),
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(child: _buildEditCard()),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildToggleCard()),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildLogoutCard(),
+                  const SizedBox(height: 40),
                 ],
               ),
             ),
@@ -199,19 +253,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String title, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+  Widget _buildScoreCard() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.grey.shade500), borderRadius: BorderRadius.circular(8)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Text('Total User Points', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 13)),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: Text('$_totalScore', style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w400)))),
+              const SizedBox(width: 8),
+              Icon(Icons.stars, color: _iconYellow, size: 36),
+            ],
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoCard(IconData icon, String title, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.grey.shade500), borderRadius: BorderRadius.circular(8)),
       child: Row(
         children: [
-          Icon(icon, color: Colors.grey[600]),
-          const SizedBox(width: 16),
+          Icon(icon, color: _iconYellow, size: 36),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(title, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-                Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                Text(title, style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 4),
+                Text(value.isEmpty ? '-' : value, style: const TextStyle(fontSize: 13, color: Colors.black), maxLines: 2, overflow: TextOverflow.ellipsis),
               ],
             ),
           ),
@@ -219,56 +299,134 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
+
+  Widget _buildEditCard() {
+    return GestureDetector(
+      onTap: _navigateToEditProfile,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.grey.shade500), borderRadius: BorderRadius.circular(8)),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Edit Profile', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            Icon(Icons.edit, color: _iconYellow, size: 28),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToggleCard() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.grey.shade500), borderRadius: BorderRadius.circular(8)),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Expanded(child: Padding(padding: EdgeInsets.only(left: 8.0), child: Text('Emergency\nInfo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, height: 1.2)))),
+          Transform.scale(
+            scale: 0.85,
+            child: Switch(value: _showEmergencyInfo, onChanged: _toggleEmergencyInfo, activeColor: Colors.white, activeTrackColor: Colors.green, inactiveThumbColor: Colors.white, inactiveTrackColor: Colors.grey.shade300),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLogoutCard() {
+    return GestureDetector(
+      onTap: _logout,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.grey.shade500), borderRadius: BorderRadius.circular(8)),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('Logout', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+            const SizedBox(width: 8),
+            Icon(Icons.exit_to_app, color: _iconYellow, size: 28),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // ---------------------------------------------------------
-// หน้าจอสำหรับแก้ไขข้อมูล (Edit Profile) - โค้ดเดิม ไม่มีการเปลี่ยนแปลง
+// หน้าแก้ไขโปรไฟล์ (บันทึกข้อมูลขึ้น Firebase)
 // ---------------------------------------------------------
 class EditProfileScreen extends StatefulWidget {
-  final String currentName;
-  final String currentPhone;
-  final String currentEmail;
-  final String currentStudentId;
-  final String currentFaculty;
-
-  const EditProfileScreen({
-    super.key,
-    required this.currentName,
-    required this.currentPhone,
-    required this.currentEmail,
-    required this.currentStudentId,
-    required this.currentFaculty,
-  });
+  final String currentName, currentPhone, currentEmail, currentStudentId, currentFaculty;
+  const EditProfileScreen({super.key, required this.currentName, required this.currentPhone, required this.currentEmail, required this.currentStudentId, required this.currentFaculty});
 
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
-  late TextEditingController _nameController;
-  late TextEditingController _phoneController;
-  late TextEditingController _emailController;
-  late TextEditingController _studentIdController;
-  late TextEditingController _facultyController;
+  late TextEditingController _nameController, _phoneController, _emailController, _studentIdController, _facultyController;
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.currentName);
-    _phoneController = TextEditingController(text: widget.currentPhone);
-    _emailController = TextEditingController(text: widget.currentEmail);
-    _studentIdController = TextEditingController(text: widget.currentStudentId);
-    _facultyController = TextEditingController(text: widget.currentFaculty);
+    _nameController = TextEditingController(text: widget.currentName == 'ยังไม่ได้ระบุชื่อ' ? '' : widget.currentName);
+    _phoneController = TextEditingController(text: widget.currentPhone == '-' ? '' : widget.currentPhone);
+    _emailController = TextEditingController(text: widget.currentEmail == '-' ? '' : widget.currentEmail);
+    _studentIdController = TextEditingController(text: widget.currentStudentId == '-' ? '' : widget.currentStudentId);
+    _facultyController = TextEditingController(text: widget.currentFaculty == '-' ? '' : widget.currentFaculty);
   }
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
-    _emailController.dispose();
-    _studentIdController.dispose();
-    _facultyController.dispose();
-    super.dispose();
+  Future<void> _saveData() async {
+    String emailText = _emailController.text.trim();
+    String phoneText = _phoneController.text.trim();
+
+    // 1. Validation 
+    if (emailText.isNotEmpty && emailText != '-') {
+      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(emailText)) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('รูปแบบอีเมลไม่ถูกต้อง'), backgroundColor: Colors.red));
+        return; 
+      }
+    }
+    if (phoneText.isNotEmpty && phoneText != '-') {
+      String phoneRaw = phoneText.replaceAll(RegExp(r'\D'), ''); 
+      if (!RegExp(r'^0\d{9}$').hasMatch(phoneRaw)) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('เบอร์ต้องขึ้นต้นด้วย 0 และมี 10 หลัก'), backgroundColor: Colors.red));
+        return; 
+      }
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      // 2. ดึง UID ผู้ใช้งานและอัปเดตลง Firestore
+      User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        // ใช้ SetOptions(merge: true) เพื่อให้เขียนทับเฉพาะฟิลด์ที่มีการแก้ไข
+        await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).set({
+          'name': _nameController.text.trim(),
+          'phone': phoneText,
+          'email': emailText,
+          'studentId': _studentIdController.text.trim(),
+          'faculty': _facultyController.text.trim()
+        }, SetOptions(merge: true));
+
+        // 3. แบ็คอัปข้อมูลลงเครื่อง
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('med_name', _nameController.text.trim());
+        await prefs.setString('med_phone', phoneText);
+        await prefs.setString('med_email', emailText);
+        await prefs.setString('med_studentId', _studentIdController.text.trim());
+        await prefs.setString('med_faculty', _facultyController.text.trim());
+
+        if (mounted) Navigator.pop(context);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('เกิดข้อผิดพลาดในการบันทึกข้อมูลบนเซิร์ฟเวอร์'), backgroundColor: Colors.red));
+    }
+    
+    setState(() => _isSaving = false);
   }
 
   @override
@@ -276,12 +434,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1D0A45),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Color(0xFFFFD700)),
-          onPressed: () => Navigator.pop(context),
-        ),
+        backgroundColor: const Color(0xFF1D0A45), 
         title: const Text('Edit Profile', style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold)),
+        leading: IconButton(icon: const Icon(Icons.arrow_back_ios, color: Color(0xFFFFD700)), onPressed: () => Navigator.pop(context)),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -289,30 +444,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           children: [
             _buildEditField('ชื่อ-นามสกุล', _nameController),
             _buildEditField('เบอร์โทรศัพท์', _phoneController, isNumber: true),
-            _buildEditField('อีเมล์มหาวิทยาลัย', _emailController),
+            _buildEditField('อีเมลมหาวิทยาลัย', _emailController),
             _buildEditField('รหัสนักศึกษา/บุคลากร', _studentIdController),
             _buildEditField('คณะ/หน่วยงาน', _facultyController),
-            
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1D0A45),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed: () {
-                  Navigator.pop(context, {
-                    'name': _nameController.text,
-                    'phone': _phoneController.text,
-                    'email': _emailController.text,
-                    'studentId': _studentIdController.text,
-                    'faculty': _facultyController.text,
-                  });
-                },
-                child: const Text('บันทึกข้อมูล', style: TextStyle(fontSize: 18, color: Color(0xFFFFD700), fontWeight: FontWeight.bold)),
-              ),
+            const SizedBox(height: 30),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1D0A45), minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+              onPressed: _isSaving ? null : _saveData,
+              child: _isSaving 
+                  ? const CircularProgressIndicator(color: Color(0xFFFFD700))
+                  : const Text('บันทึกข้อมูล', style: TextStyle(color: Color(0xFFFFD700), fontSize: 18, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -322,19 +463,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Widget _buildEditField(String label, TextEditingController controller, {bool isNumber = false}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
+      padding: const EdgeInsets.only(bottom: 20.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black54)),
+          Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 8),
           TextField(
             controller: controller,
             keyboardType: isNumber ? TextInputType.phone : TextInputType.text,
+            maxLength: isNumber ? 10 : null,
+            inputFormatters: isNumber ? [FilteringTextInputFormatter.digitsOnly] : null,
             decoration: InputDecoration(
-              filled: true,
-              fillColor: Colors.grey[200],
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+              filled: true, fillColor: Colors.grey[100], 
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              counterText: "", 
             ),
           ),
         ],
