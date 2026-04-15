@@ -68,5 +68,6 @@
    git clone [https://github.com/USERNAME/project_mu_campus.git](https://github.com/USERNAME/project_mu_campus.git)
 2. ติดตั้งแพ็กเกจที่จำเป็นทั้งหมด:
   flutter pub get
+
 3.รันแอปพลิเคชัน (แนะนำให้รันบนอุปกรณ์สมาร์ตโฟนจริงเพื่อการทำงานที่สมบูรณ์ของ GPS และกล้อง):
   flutter run
