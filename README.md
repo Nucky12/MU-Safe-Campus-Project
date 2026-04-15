@@ -1,16 +1,72 @@
-# project_mu_campus
+# MU Safe Campus 
 
-A new Flutter project.
+**MU Safe Campus** คือแอปพลิเคชันด้านความปลอดภัยแบบครบวงจร ที่ออกแบบมาเพื่อนักศึกษาและบุคลากรของ มหาวิทยาลัยมหิดล (วิทยาเขตศาลายา) แอปพลิเคชันนี้รวบรวมฟังก์ชันที่จำเป็นต่อการรับมือกับเหตุฉุกเฉิน การเรียนรู้ด้านความปลอดภัย และการมีส่วนร่วมในการสร้างสภาพแวดล้อมที่ปลอดภัยภายในมหาวิทยาลัย
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+##  ฟีเจอร์หลัก (Key Features)
 
-A few resources to get you started if this is your first Flutter project:
+### 1. Safety Map (แผนที่ความปลอดภัย)
+* แผนที่ Interactive แสดงพิกัด **จุดติดตั้งเครื่อง AED และห้องพยาบาล (First Aid)** รวม 34 จุดทั่วมหาวิทยาลัยมหิดล ศาลายา
+* ระบบระบุพิกัด GPS ปัจจุบันของผู้ใช้ (My Location)
+* กดดูรายละเอียดสถานที่ และมีปุ่ม **"เส้นทาง"** เพื่อส่งพิกัดไปนำทางต่อในแอป Google Maps (โหมดเดินเท้า) ได้ทันที
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+### 2. Digital Medical Card (บัตรข้อมูลทางการแพทย์ฉุกเฉิน)
+* บันทึกข้อมูลสุขภาพส่วนบุคคล เช่น โรคประจำตัว, ประวัติการแพ้ยา, หมู่เลือด และเบอร์ติดต่อผู้ปกครอง
+* **Emergency Mode:** เข้าถึง Medical ID ได้จากหน้า Login ทันที (ไม่ต้องล็อกอิน) เพื่อให้กู้ภัยหรือผู้ช่วยเหลือทราบข้อมูลแพ้ยาและเบอร์ติดต่อฉุกเฉินได้ทันเวลา
+* ข้อมูลถูกซิงก์เก็บไว้ทั้งในเครื่อง (Local Storage) และบนคลาวด์ (Firestore)
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+### 3. External Emergency Contacts (เบอร์โทรฉุกเฉิน)
+* รวบรวมเบอร์สายด่วนที่สำคัญ (1669, 191, 199, 1554, 1137) 
+* มีคำแนะนำ "ข้อควรรู้เมื่อโทร" เพื่อให้ผู้แจ้งมีสติและให้ข้อมูลกับเจ้าหน้าที่ได้อย่างถูกต้อง
+* สามารถกดที่เบอร์เพื่อ **โทรออก (Make a phone call)** จากตัวแอปได้ทันที
+
+### 4. Hazard Reporter & History (ระบบแจ้งจุดเสี่ยง)
+* นักศึกษาสามารถถ่ายรูป หรือแนบภาพจุดเสี่ยง/อุปกรณ์ชำรุดในมหาวิทยาลัย พร้อมระบุพิกัดและรายละเอียด
+* ข้อมูลจะถูกส่งตรงเข้าฐานข้อมูล Firebase แบบเรียลไทม์
+* มีหน้า **My Reporting History** เพื่อให้ผู้ใช้ติดตามสถานะการแจ้งเหตุของตนเองได้ (เช่น รับเรื่องแล้ว)
+
+### 5. Safety Quiz & Achievement (แบบทดสอบและเหรียญรางวัล)
+* แหล่งรวบรวมแบบทดสอบความปลอดภัย 6 หมวดหมู่ (First Aid, CPR, Fire Safety, Campus Safety, Wildlife, Emergency Protocols)
+* มีระบบตรวจคำตอบ คำนวณคะแนน และแสดงผลความแม่นยำรายหมวดหมู่ในหน้า **Safety Badge (โปรไฟล์คะแนน)**
+* บันทึกคะแนนลงฐานข้อมูล เพื่อดูการประเมินผลความรู้ด้านความปลอดภัยของตนเอง
+
+### 6. Authentication (ระบบบัญชีผู้ใช้)
+* ระบบสมัครสมาชิกและเข้าสู่ระบบผ่าน **Firebase Authentication**
+* รองรับการเข้าสู่ระบบด้วยอีเมลและการค้นหาบัญชีผ่านเบอร์โทรศัพท์มือถือ
+* ฟังก์ชัน "Remember Me" (จดจำฉัน) เพื่อความสะดวกรวดเร็วในการเข้าใช้งานครั้งถัดไป
+
+### 7. Safety FAQ & Tips (เกร็ดความรู้ความปลอดภัย)
+* รวบรวมคู่มือการเอาตัวรอดในสถานการณ์ต่างๆ เช่น แผ่นดินไหว (Drop, Cover, Hold on), เหตุกราดยิง (Run, Hide, Fight), ไฟไหม้ (หลักการ PASS) ฯลฯ
+
+---
+
+## โครงสร้างเทคโนโลยี (Tech Stack)
+
+* **Frontend Framework:** [Flutter](https://flutter.dev/) (Dart)
+* **Backend & Database:** [Firebase](https://firebase.google.com/)
+  * Firebase Authentication (ระบบจัดการบัญชีผู้ใช้)
+  * Cloud Firestore (ระบบฐานข้อมูล NoSQL สำหรับเก็บข้อมูลโปรไฟล์, ประวัติการแจ้งเหตุ, และคะแนนควิซ)
+* **Key Dependencies:**
+  * `flutter_map` & `latlong2`: แผนที่ OpenStreetMap
+  * `geolocator`: ค้นหาพิกัด GPS ของผู้ใช้งาน
+  * `url_launcher`: ส่งพิกัดไปยัง Google Maps และคำสั่งโทรออก
+  * `shared_preferences`: บันทึกข้อมูล Local Storage และโหมดออฟไลน์
+  * `image_picker`: จัดการการถ่ายรูปและเลือกรูปภาพจากแกลเลอรี
+
+---
+
+## วิธีการติดตั้งและรันโปรเจกต์ (Getting Started)
+
+### ข้อกำหนดเบื้องต้น
+* ติดตั้ง Flutter SDK (เวอร์ชันล่าสุด)
+* เพิ่มไฟล์คอนฟิก Firebase (`google-services.json` สำหรับ Android และ `GoogleService-Info.plist` สำหรับ iOS) ไว้ในโปรเจกต์
+
+### ขั้นตอนการรัน
+1. โคลนโปรเจกต์นี้ลงในเครื่องของคุณ:
+   ```bash
+   git clone [https://github.com/USERNAME/project_mu_campus.git](https://github.com/USERNAME/project_mu_campus.git)
+2. ติดตั้งแพ็กเกจที่จำเป็นทั้งหมด:
+  flutter pub get
+3.รันแอปพลิเคชัน (แนะนำให้รันบนอุปกรณ์สมาร์ตโฟนจริงเพื่อการทำงานที่สมบูรณ์ของ GPS และกล้อง):
+  flutter run
