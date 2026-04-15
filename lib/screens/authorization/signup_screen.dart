@@ -56,8 +56,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
             _buildTextField('กรอกชื่อ - นามสกุล', controller: _nameController),
             const SizedBox(height: 16),
             
-            _buildLabel('อีเมลมหาวิทยาลัยมหิดล'),
-            _buildTextField('กรอกอีเมลมหาวิทยาลัย', controller: _emailController, keyboardType: TextInputType.emailAddress),
+            _buildLabel('อีเมล'),
+            _buildTextField('กรอกอีเมล', controller: _emailController, keyboardType: TextInputType.emailAddress),
             const SizedBox(height: 16),
             
             _buildLabel('เบอร์โทรศัพท์'),

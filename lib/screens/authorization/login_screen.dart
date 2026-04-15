@@ -74,7 +74,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(_isEmailLogin ? 'อีเมลมหาวิทยาลัย' : 'เบอร์โทรศัพท์', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    Text(_isEmailLogin ? 'อีเมล' : 'เบอร์โทรศัพท์', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _usernameController,
@@ -112,7 +112,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             if (!_rememberMe) _usernameController.clear(); 
                           });
                         },
-                        child: Text(_isEmailLogin ? 'เข้าสู่ระบบด้วยเบอร์โทรศัพท์' : 'เข้าสู่ระบบด้วยอีเมลมหาวิทยาลัย', style: const TextStyle(color: Colors.blue, decoration: TextDecoration.underline)),
+                        child: Text(_isEmailLogin ? 'เข้าสู่ระบบด้วยเบอร์โทรศัพท์' : 'เข้าสู่ระบบด้วยอีเมล', style: const TextStyle(color: Colors.blue, decoration: TextDecoration.underline)),
                       ),
                     ),
 

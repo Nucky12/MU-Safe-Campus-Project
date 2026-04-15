@@ -1,21 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart'; // <--- 1. เพิ่ม Import สำหรับ Firebase
-import 'firebase_options.dart'; // <--- 2. เพิ่ม Import สำหรับไฟล์ตั้งค่า Firebase
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
-// ตรวจสอบให้แน่ใจว่า Import path ตรงกับโฟลเดอร์ของคุณ
+// นำเข้าหน้าจอต่างๆ
+import 'screens/authorization/splash_screen.dart'; // <--- เพิ่มบรรทัดนี้
 import 'screens/authorization/login_screen.dart';
 import 'screens/dashboard/main_layout.dart';
 
-// 3. เปลี่ยนจาก void main() ธรรมดา เป็น void main() async
 void main() async {
-  // 4. ต้องมีบรรทัดนี้เพื่อให้ Flutter เตรียมความพร้อมก่อนรัน Firebase
   WidgetsFlutterBinding.ensureInitialized(); 
-  
-  // 5. เริ่มต้นการเชื่อมต่อ Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-
   runApp(const MuSafeCampusApp());
 }
 
@@ -37,13 +33,14 @@ class MuSafeCampusApp extends StatelessWidget {
           elevation: 0,
         ),
       ),
-      // กำหนดหน้าแรกเมื่อเปิดแอป
-      initialRoute: '/login', 
+      // 1. เปลี่ยนหน้าแรกจาก /login เป็น /splash
+      initialRoute: '/splash', 
       
-      // ทะเบียนเส้นทาง (Routes) ทั้งหมดของแอปอยู่ที่นี่
       routes: {
+        // 2. เพิ่ม Route สำหรับหน้าโหลด
+        '/splash': (context) => const SplashScreen(), 
         '/login': (context) => const LoginScreen(),
-        '/main': (context) => const MainLayout(), // ตรงนี้คือจุดที่ทำให้กดปุ่ม Login แล้วมาหน้าหลัก
+        '/main': (context) => const MainLayout(),
       },
     );
   }
