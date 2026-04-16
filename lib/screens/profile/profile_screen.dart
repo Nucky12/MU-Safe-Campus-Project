@@ -4,8 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+<<<<<<< HEAD
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+=======
+import 'package:firebase_auth/firebase_auth.dart'; // นำเข้า Firebase Auth
+import 'package:cloud_firestore/cloud_firestore.dart'; // นำเข้า Firestore
+>>>>>>> 474e6246fff97eb4768d1411943f8974ff2db20f
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -22,7 +27,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _faculty = '-';
   int _totalScore = 0;
   bool _showEmergencyInfo = false;
+<<<<<<< HEAD
   bool _isLoadingAPI = true;
+=======
+  bool _isLoadingAPI = true; // แอนิเมชันโหลดข้อมูล
+>>>>>>> 474e6246fff97eb4768d1411943f8974ff2db20f
   
   Uint8List? _imageBytes;
   final ImagePicker _picker = ImagePicker();
@@ -31,7 +40,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+<<<<<<< HEAD
     _fetchProfileFromFirebase();
+=======
+    _fetchProfileFromFirebase(); // เรียกใช้ฟังก์ชันโหลดข้อมูลจาก Firebase
+>>>>>>> 474e6246fff97eb4768d1411943f8974ff2db20f
   }
 
   // --- โหลดข้อมูลจาก Firebase ---
@@ -40,9 +53,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final prefs = await SharedPreferences.getInstance();
 
     try {
+<<<<<<< HEAD
       User? currentUser = FirebaseAuth.instance.currentUser;
 
       if (currentUser != null) {
+=======
+      // 1. ดึง UID ของผู้ใช้ที่กำลังล็อกอินอยู่
+      User? currentUser = FirebaseAuth.instance.currentUser;
+
+      if (currentUser != null) {
+        // 2. ดึงข้อมูลจากกล่อง (Document) ของผู้ใช้คนนั้นใน Firestore
+>>>>>>> 474e6246fff97eb4768d1411943f8974ff2db20f
         DocumentSnapshot doc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
 
         if (doc.exists) {
@@ -61,6 +82,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           await prefs.setString('med_email', _email);
           await prefs.setString('med_studentId', _studentId);
           await prefs.setString('med_faculty', _faculty);
+<<<<<<< HEAD
         } else {
           // 🛑 [ส่วนที่แก้] ถ้าเป็นผู้ใช้ใหม่ ไม่มีข้อมูลในเน็ต ให้ลบข้อมูลเก่าในเครื่องทิ้ง 🛑
           await prefs.remove('med_name');
@@ -78,6 +100,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _faculty = '-';
             _imageBytes = null;
           });
+=======
+>>>>>>> 474e6246fff97eb4768d1411943f8974ff2db20f
         }
       }
     } catch (e) {
@@ -147,6 +171,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
+<<<<<<< HEAD
               // 🛑 [ส่วนที่แก้] ล้างข้อมูลโปรไฟล์ในเครื่องทิ้งก่อน Logout 🛑
               final prefs = await SharedPreferences.getInstance();
               await prefs.remove('med_name');
@@ -156,6 +181,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               await prefs.remove('med_faculty');
               await prefs.remove('med_imageBytes');
 
+=======
+>>>>>>> 474e6246fff97eb4768d1411943f8974ff2db20f
               // ออกจากระบบผ่าน Firebase
               await FirebaseAuth.instance.signOut(); 
               if (context.mounted) Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
@@ -169,11 +196,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+<<<<<<< HEAD
+=======
+    // ระหว่างรอโหลดข้อมูลจากเซิร์ฟเวอร์
+>>>>>>> 474e6246fff97eb4768d1411943f8974ff2db20f
     if (_isLoadingAPI) {
       return const Scaffold(backgroundColor: Colors.white, body: Center(child: CircularProgressIndicator(color: Color(0xFF1D0A45))));
     }
 
+<<<<<<< HEAD
     bool hasName = _name.isNotEmpty && _name != 'ยังไม่ได้ระบุชื่อ' && _name != 'ผู้ใช้งานใหม่';
+=======
+    bool hasName = _name.isNotEmpty && _name != 'ยังไม่ได้ระบุชื่อ';
+>>>>>>> 474e6246fff97eb4768d1411943f8974ff2db20f
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -216,7 +251,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 20),
             
+<<<<<<< HEAD
             // --- 3. ส่วน Card Grid ---
+=======
+            // --- 3. ส่วน Card Grid (ออกแบบยืดหยุ่นป้องกัน Overflow) ---
+>>>>>>> 474e6246fff97eb4768d1411943f8974ff2db20f
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
@@ -394,7 +433,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
+<<<<<<< HEAD
     _nameController = TextEditingController(text: widget.currentName == 'ยังไม่ได้ระบุชื่อ' || widget.currentName == 'ผู้ใช้งานใหม่' ? '' : widget.currentName);
+=======
+    _nameController = TextEditingController(text: widget.currentName == 'ยังไม่ได้ระบุชื่อ' ? '' : widget.currentName);
+>>>>>>> 474e6246fff97eb4768d1411943f8974ff2db20f
     _phoneController = TextEditingController(text: widget.currentPhone == '-' ? '' : widget.currentPhone);
     _emailController = TextEditingController(text: widget.currentEmail == '-' ? '' : widget.currentEmail);
     _studentIdController = TextEditingController(text: widget.currentStudentId == '-' ? '' : widget.currentStudentId);
@@ -423,8 +466,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     setState(() => _isSaving = true);
 
     try {
+<<<<<<< HEAD
       User? currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null) {
+=======
+      // 2. ดึง UID ผู้ใช้งานและอัปเดตลง Firestore
+      User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        // ใช้ SetOptions(merge: true) เพื่อให้เขียนทับเฉพาะฟิลด์ที่มีการแก้ไข
+>>>>>>> 474e6246fff97eb4768d1411943f8974ff2db20f
         await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).set({
           'name': _nameController.text.trim(),
           'phone': phoneText,
@@ -433,6 +483,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           'faculty': _facultyController.text.trim()
         }, SetOptions(merge: true));
 
+<<<<<<< HEAD
+=======
+        // 3. แบ็คอัปข้อมูลลงเครื่อง
+>>>>>>> 474e6246fff97eb4768d1411943f8974ff2db20f
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('med_name', _nameController.text.trim());
         await prefs.setString('med_phone', phoneText);
@@ -443,7 +497,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         if (mounted) Navigator.pop(context);
       }
     } catch (e) {
+<<<<<<< HEAD
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('เกิดข้อผิดพลาดในการบันทึกข้อมูล'), backgroundColor: Colors.red));
+=======
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('เกิดข้อผิดพลาดในการบันทึกข้อมูลบนเซิร์ฟเวอร์'), backgroundColor: Colors.red));
+>>>>>>> 474e6246fff97eb4768d1411943f8974ff2db20f
     }
     
     setState(() => _isSaving = false);
@@ -464,7 +522,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           children: [
             _buildEditField('ชื่อ-นามสกุล', _nameController),
             _buildEditField('เบอร์โทรศัพท์', _phoneController, isNumber: true),
+<<<<<<< HEAD
             _buildEditField('อีเมล', _emailController),
+=======
+            _buildEditField('อีเมลมหาวิทยาลัย', _emailController),
+>>>>>>> 474e6246fff97eb4768d1411943f8974ff2db20f
             _buildEditField('รหัสนักศึกษา/บุคลากร', _studentIdController),
             _buildEditField('คณะ/หน่วยงาน', _facultyController),
             const SizedBox(height: 30),

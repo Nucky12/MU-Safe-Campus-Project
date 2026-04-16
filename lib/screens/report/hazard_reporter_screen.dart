@@ -182,7 +182,11 @@ class _HazardReporterScreenState extends State<HazardReporterScreen> {
                   const SizedBox(height: 16),
                   
                   _buildLabel('ชื่อ-นามสกุลผู้แจ้ง'),
+<<<<<<< HEAD
                   _buildTextField('เช่น นายสมชาย รักชาติ', _nameController),
+=======
+                  _buildTextField('เช่น นายสิรวิชญ์ น้อยเจริญ', _nameController),
+>>>>>>> 474e6246fff97eb4768d1411943f8974ff2db20f
                   
                   const SizedBox(height: 12),
                   _buildLabel('สถานที่'),
