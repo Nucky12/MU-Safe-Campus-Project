@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // นำเข้า Firebase Auth
-import 'package:cloud_firestore/cloud_firestore.dart'; // นำเข้า Firestore
+import 'package:firebase_auth/firebase_auth.dart'; 
+import 'package:cloud_firestore/cloud_firestore.dart'; 
 
 class ScoreAchievementScreen extends StatefulWidget {
   const ScoreAchievementScreen({super.key});
@@ -31,7 +31,7 @@ class _ScoreAchievementScreenState extends State<ScoreAchievementScreen> {
   Future<void> _loadAllData() async {
     final prefs = await SharedPreferences.getInstance();
     
-    // 1. พยายามดึงคะแนนล่าสุดจาก Firebase ก่อน (ถ้ามีเน็ต)
+    //พยายามดึงคะแนนล่าสุดจาก Firebase ก่อน 
     try {
       User? currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null) {
@@ -56,7 +56,7 @@ class _ScoreAchievementScreenState extends State<ScoreAchievementScreen> {
       print("Error fetching scores from Firebase: $e"); // ถ้าพังให้ปล่อยผ่านไปใช้ข้อมูลที่เคยเซฟไว้
     }
 
-    // 2. โหลดและคำนวณจาก SharedPreferences (เพื่อแสดงผล)
+    //  โหลดและคำนวณจาก SharedPreferences
     String? name = prefs.getString('med_name');
     String? base64Image = prefs.getString('med_imageBytes');
     

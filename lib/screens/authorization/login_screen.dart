@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // นำเข้า Firebase Auth
-import 'package:cloud_firestore/cloud_firestore.dart'; // นำเข้า Firestore
-
+import 'package:firebase_auth/firebase_auth.dart'; 
+import 'package:cloud_firestore/cloud_firestore.dart'; 
 import 'signup_screen.dart';
 import '../emergency/medical_id_screen.dart';
 
